@@ -6,9 +6,8 @@ Puts an operator-assigned prefix in front of a player's name in chat, followed b
 player is in.
 
 ```text
-[本服][末地]aaa_ovo » 第二个末地城
+[末地]Aleax » hello
 [大佬][主世界]Steve » hello
-[下界]Alex » where is everyone
 ```
 
 * The prefix (`[本服]`) is assigned per player by an operator with a command, and is stored in
