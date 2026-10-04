@@ -1,0 +1,48 @@
+# ChatPrefix 配置
+# 改完在游戏里执行 /chatprefix reload 即可生效，不需要重启服务器。
+# 颜色可以写命名颜色（gray / red / gold / light_purple …）或 #rrggbb；
+# 文本里可以用 & 颜色代码（&c、&l）或 MiniMessage 标签（<red>、<gradient:#ff0000:#0000ff>）。
+
+# 一整行聊天的模板，按占位符拼接。
+# 可用：{prefix} {dimension} {name} {separator} {message}
+# 默认对应：[前缀][维度]玩家名 » 消息
+format: "{prefix}{dimension}{name}{separator}{message}"
+
+prefix:
+  # 玩家没有被设置前缀时显示什么；留空 "" 表示这一整段不显示（默认，即你说的“滚木”）
+  default: ""
+  # 前缀外层包裹格式；{text} 是 op 用指令输入的原文字。
+  # 保持默认时，op 只需要输入 本服，聊天里就显示 [本服]
+  wrapper: "[{text}]"
+  # 前缀默认颜色；op 自己在文字里写了颜色代码时以文字里的为准。留空 "" 表示不额外上色
+  color: ""
+  # 是否允许在前缀里使用 MiniMessage 标签（<red>、<bold>）。false 时 < > 只当普通字符
+  allow-minimessage: true
+  # 前缀最大长度，按去掉颜色代码后的可见字符数计算；0 表示不限制
+  max-length: 24
+
+dimension:
+  # 维度标签外层包裹格式；{label} 是下面 labels 里的文字
+  wrapper: "[{label}]"
+  labels:
+    OVERWORLD: "主世界"
+    NETHER: "下界"
+    THE_END: "末地"
+  # 自定义维度（数据包/模组世界）的标签，{world} 是世界名
+  custom-label: "{world}"
+  colors:
+    OVERWORLD: "green"
+    NETHER: "red"
+    THE_END: "light_purple"
+    CUSTOM: "yellow"
+
+name:
+  # true = 用服务端的显示名（昵称插件、计分板队伍会改变它）；false = 始终用真实 ID
+  use-display-name: false
+  # 名字颜色；留空 "" 表示不改动（保留原版颜色或队伍颜色）
+  color: ""
+
+separator:
+  # 名字与消息之间的分隔符
+  text: " » "
+  color: "gray"

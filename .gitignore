@@ -1,0 +1,12 @@
+# 构建产物与本地依赖（第三方 jar 不进版本库）
+build/
+dist/
+*.class
+.testserver/
+tests/out/
+
+# 依赖 jar（见 README「自己编译」一节自行下载；** 前缀才能匹配 1.21.11/lib/*.jar）
+**/lib/*.jar
+
+# 本地临时结果
+*-result*.txt
