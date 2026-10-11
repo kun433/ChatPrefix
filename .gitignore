@@ -5,6 +5,8 @@ dist/
 .testserver/
 tests/out/
 
+# 注意：artifacts/ 是刻意纳入版本库的分发副本（插件 jar 与资源包 zip），不要加进忽略列表
+
 # 依赖 jar（见 README「自己编译」一节自行下载；** 前缀才能匹配 1.21.11/lib/*.jar）
 **/lib/*.jar
 
