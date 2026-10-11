@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -21,6 +22,9 @@ public final class Text {
 
     private static final char SECTION = '\u00a7';
     private static final MiniMessage MM = MiniMessage.miniMessage();
+
+    /** 裸 &lt;rainbow&gt; 标签；带参数的 &lt;rainbow:2&gt; 不匹配，保持用户自己指定的静态相位。 */
+    private static final Pattern BARE_RAINBOW = Pattern.compile("(?i)<rainbow\\s*>");
 
     /** 传统颜色代码 → MiniMessage 标签。 */
     private static final Map<Character, String> LEGACY = new LinkedHashMap<>();
@@ -90,12 +94,27 @@ public final class Text {
      * @param allowMiniMessage false 表示把 &lt; &gt; 当作普通字符，只认 &amp; 颜色代码
      */
     public static Component parse(String raw, boolean allowMiniMessage) {
+        return parse(raw, allowMiniMessage, 0);
+    }
+
+    /**
+     * 解析一段文本，并可把裸 &lt;rainbow&gt; 换成带相位的 &lt;rainbow:N&gt;，让彩虹随时间流动。
+     *
+     * @param rainbowPhase 0-9 的整数相位（MiniMessage 只接受 0-10，1 单位 = 36°，10 = 一整圈）；
+     *                     0 表示不动。只替换不带参数的 &lt;rainbow&gt;，&lt;rainbow:2&gt; 这类写法原样保留，
+     *                     免得把用户自己指定的固定相位也改掉。
+     */
+    public static Component parse(String raw, boolean allowMiniMessage, int rainbowPhase) {
         if (raw == null || raw.isEmpty()) {
             return Component.empty();
         }
-        String converted = legacyToTags(raw);
-        if (!allowMiniMessage) {
-            converted = MM.escapeTags(converted);
+        // 顺序很重要：先按需把 < > 转义成普通字符，再转换 & 颜色代码。
+        // 反过来会把 legacyToTags 刚生成的 <red> 也一起转义掉，&c 就失效了。
+        String converted = allowMiniMessage ? raw : MM.escapeTags(raw);
+        converted = legacyToTags(converted);
+        if (allowMiniMessage && rainbowPhase != 0) {
+            converted = BARE_RAINBOW.matcher(converted)
+                    .replaceAll("<rainbow:" + Math.floorMod(rainbowPhase, 10) + ">");
         }
         try {
             return MM.deserialize(converted);
@@ -106,6 +125,32 @@ public final class Text {
                 return Component.text(raw);
             }
         }
+    }
+
+    /** 文本里是否含裸 &lt;rainbow&gt; 标签：调用方用它判断「这个前缀想要彩虹」。 */
+    public static boolean wantsRainbow(String raw) {
+        return raw != null && BARE_RAINBOW.matcher(raw).find();
+    }
+
+    /**
+     * 强制整棵树的颜色（**覆盖**节点已有颜色），其它样式保留。
+     *
+     * <p>与 {@link #tint} 的区别：tint 只补「本身没有颜色」的节点，forceColor 是全部改掉。
+     * 用于把整个前缀刷成资源包约定的魔法色——着色器要求每个字都是那个精确颜色。
+     */
+    public static Component forceColor(Component component, TextColor color) {
+        if (component == null || color == null) {
+            return component;
+        }
+        Component styled = component.color(color);
+        if (component.children().isEmpty()) {
+            return styled;
+        }
+        List<Component> children = new ArrayList<>(component.children().size());
+        for (Component child : component.children()) {
+            children.add(forceColor(child, color));
+        }
+        return styled.children(children);
     }
 
     /** 去掉颜色代码与标签后的可见长度，用于限制前缀长度。 */
@@ -141,7 +186,11 @@ public final class Text {
      * 而这里正好需要 "[末地]" 这种由多个子节点拼出来的段落整体上色。
      */
     public static Component tint(Component component, String colorName) {
-        TextColor color = color(colorName);
+        return tint(component, color(colorName));
+    }
+
+    /** 同 {@link #tint(Component, String)}，但直接接收已经解析好的颜色，便于按文字颜色回填。 */
+    public static Component tint(Component component, TextColor color) {
         if (component == null || color == null) {
             return component;
         }
@@ -151,8 +200,43 @@ public final class Text {
         }
         List<Component> children = new ArrayList<>(component.children().size());
         for (Component child : component.children()) {
-            children.add(tint(child, colorName));
+            children.add(tint(child, color));
         }
         return styled.children(children);
+    }
+
+    /**
+     * 组件树里第一个显式颜色：先看节点自身，再按子节点顺序往下找。
+     * 整棵树都没有颜色时返回 null。用来让前缀外层方括号跟随文字颜色。
+     */
+    public static TextColor firstColor(Component component) {
+        if (component == null) {
+            return null;
+        }
+        if (component.color() != null) {
+            return component.color();
+        }
+        for (Component child : component.children()) {
+            TextColor found = firstColor(child);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    /** 组件树里最后一个显式颜色：从最后一个子节点往前找；整棵树都没有颜色时返回 null。 */
+    public static TextColor lastColor(Component component) {
+        if (component == null) {
+            return null;
+        }
+        List<Component> children = component.children();
+        for (int i = children.size() - 1; i >= 0; i--) {
+            TextColor found = lastColor(children.get(i));
+            if (found != null) {
+                return found;
+            }
+        }
+        return component.color();
     }
 }

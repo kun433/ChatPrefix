@@ -14,8 +14,18 @@ prefix:
   # 前缀外层包裹格式；{text} 是 op 用指令输入的原文字。
   # 保持默认时，op 只需要输入 本服，聊天里就显示 [本服]
   wrapper: "[{text}]"
-  # 前缀默认颜色；op 自己在文字里写了颜色代码时以文字里的为准。留空 "" 表示不额外上色
+  # 前缀默认颜色。留空 "" 表示不额外上色：此时外层方括号（wrapper 里的字面部分）
+  # 会跟随文字颜色，/cp set Steve &c大佬 就能得到整段变红的 [大佬]。
+  # 填了颜色（如 gold / #ff8800）则连方括号一起统一上色；op 在文字里写的颜色代码始终优先。
   color: ""
+  # 彩虹流动：前缀里写 <rainbow>（不带相位）时，让每条消息的彩虹起点随时间前移。
+  # Minecraft 聊天行发出后客户端就定死了，无法原地改色；所以这里的“动画”表现为
+  # 每发一条消息颜色往前滚一格（10 格 = 一整圈）。
+  # 想固定颜色的彩虹，写 <rainbow:2>、<rainbow:!> 这种带相位的写法即可，不受这里影响。
+  rainbow:
+    animate: true
+    # 每秒推进多少格相位；10 格 = 一整圈
+    speed: 1.0
   # 是否允许在前缀里使用 MiniMessage 标签（<red>、<bold>）。false 时 < > 只当普通字符
   allow-minimessage: true
   # 前缀最大长度，按去掉颜色代码后的可见字符数计算；0 表示不限制
@@ -46,3 +56,18 @@ separator:
   # 名字与消息之间的分隔符
   text: " » "
   color: "gray"
+
+# 资源包侧的真·原地彩虹。工作方式是：资源包用 rendertype_text 核心着色器把某个「魔法色」
+# 渲成持续滚动的彩虹（见 resourcepack/），插件把装了包的玩家看到的前缀刷成那个颜色。
+# 没装包的玩家不受影响，继续用 prefix.rainbow 的逐消息相位彩虹。
+pack:
+  # 关掉则一律走逐消息相位彩虹，不会向任何玩家输出魔法色
+  enabled: true
+  # 触发色：必须与资源包 _config.glsl 里 TEXT_EFFECT(...) 的颜色完全一致
+  # 默认值对应 resourcepack/ 里的 apply_rainbow()，不要随手改
+  magic-color: "#F8F85C"
+  # 怎么判定玩家装没装包：
+  #   auto   = 用 Bukkit/Paper API（hasResourcePack / getResourcePackStatus）
+  #   always = 当所有人都装了（服务器强制下发资源包、而又不想依赖上面那个判定时用）
+  #   never  = 一律当作没装
+  detect: auto

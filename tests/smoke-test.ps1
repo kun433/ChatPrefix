@@ -70,7 +70,7 @@ $props = @(
 Set-Content -Path "$ServerDir\server.properties" -Value $props -Encoding ASCII
 
 # 放插件
-Copy-Item "$base\dist\ChatPrefix-1.0.0-1.21.11.jar" "$ServerDir\plugins\" -Force
+Copy-Item "$base\dist\ChatPrefix-1.2.0-1.21.11.jar" "$ServerDir\plugins\" -Force
 New-Item -ItemType Directory -Force -Path "$ServerDir\plugins\ChatPrefix" | Out-Null
 # 预置两条记录：验证 prefixes.yml 的中文与颜色代码能读进来（玩家不在线也能被指令查到）
 $seed = @"

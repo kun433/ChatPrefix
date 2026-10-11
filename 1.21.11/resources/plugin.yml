@@ -1,6 +1,6 @@
 name: ChatPrefix
 main: com.chatprefix.ChatPrefix
-version: 1.0.0-1.21.11
+version: 1.2.0-1.21.11
 api-version: '1.21'
 description: 在聊天栏给玩家名字前加上 op 分配的前缀，并标注玩家所在维度（主世界/下界/末地）。
 author: ChatPrefix

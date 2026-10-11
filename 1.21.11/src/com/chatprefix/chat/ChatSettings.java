@@ -18,6 +18,8 @@ public final class ChatSettings {
     private final String prefixColor;
     private final boolean prefixAllowMiniMessage;
     private final int prefixMaxLength;
+    private final boolean prefixRainbowAnimate;
+    private final double prefixRainbowSpeed;
     private final String dimensionWrapper;
     private final String dimensionCustomLabel;
     private final Map<String, String> dimensionLabels;
@@ -26,18 +28,25 @@ public final class ChatSettings {
     private final String nameColor;
     private final String separatorText;
     private final String separatorColor;
+    private final boolean packEnabled;
+    private final String packMagicColor;
+    private final String packDetect;
 
     private ChatSettings(String format, String prefixDefault, String prefixWrapper, String prefixColor,
-                         boolean prefixAllowMiniMessage, int prefixMaxLength, String dimensionWrapper,
+                         boolean prefixAllowMiniMessage, int prefixMaxLength, boolean prefixRainbowAnimate,
+                         double prefixRainbowSpeed, String dimensionWrapper,
                          String dimensionCustomLabel, Map<String, String> dimensionLabels,
                          Map<String, String> dimensionColors, boolean nameUseDisplayName, String nameColor,
-                         String separatorText, String separatorColor) {
+                         String separatorText, String separatorColor, boolean packEnabled,
+                         String packMagicColor, String packDetect) {
         this.format = format;
         this.prefixDefault = prefixDefault;
         this.prefixWrapper = prefixWrapper;
         this.prefixColor = prefixColor;
         this.prefixAllowMiniMessage = prefixAllowMiniMessage;
         this.prefixMaxLength = prefixMaxLength;
+        this.prefixRainbowAnimate = prefixRainbowAnimate;
+        this.prefixRainbowSpeed = prefixRainbowSpeed;
         this.dimensionWrapper = dimensionWrapper;
         this.dimensionCustomLabel = dimensionCustomLabel;
         this.dimensionLabels = Map.copyOf(dimensionLabels);
@@ -46,6 +55,9 @@ public final class ChatSettings {
         this.nameColor = nameColor;
         this.separatorText = separatorText;
         this.separatorColor = separatorColor;
+        this.packEnabled = packEnabled;
+        this.packMagicColor = packMagicColor;
+        this.packDetect = packDetect;
     }
 
     /** 内置默认值，等价于 config.yml 全部缺项时的结果（用空 Configuration 走同一套读取逻辑）。 */
@@ -72,6 +84,8 @@ public final class ChatSettings {
                 cfg.getString("prefix.color", ""),
                 cfg.getBoolean("prefix.allow-minimessage", true),
                 Math.max(0, cfg.getInt("prefix.max-length", 24)),
+                cfg.getBoolean("prefix.rainbow.animate", true),
+                cfg.getDouble("prefix.rainbow.speed", 1.0),
                 cfg.getString("dimension.wrapper", "[{label}]"),
                 cfg.getString("dimension.custom-label", "{world}"),
                 labels,
@@ -79,7 +93,10 @@ public final class ChatSettings {
                 cfg.getBoolean("name.use-display-name", false),
                 cfg.getString("name.color", ""),
                 cfg.getString("separator.text", " » "),
-                cfg.getString("separator.color", "gray"));
+                cfg.getString("separator.color", "gray"),
+                cfg.getBoolean("pack.enabled", true),
+                cfg.getString("pack.magic-color", "#F8F85C"),
+                cfg.getString("pack.detect", "auto"));
     }
 
     /** 整行模板，占位符：{prefix} {dimension} {name} {separator} {message}。 */
@@ -110,6 +127,16 @@ public final class ChatSettings {
         return prefixMaxLength;
     }
 
+    /** 前缀里写裸 &lt;rainbow&gt; 时，是否让相位随时间流动（每条消息颜色往前滚一格）。 */
+    public boolean prefixRainbowAnimate() {
+        return prefixRainbowAnimate;
+    }
+
+    /** 彩虹流动速度：每秒推进多少格相位（10 格 = 一整圈）。 */
+    public double prefixRainbowSpeed() {
+        return prefixRainbowSpeed;
+    }
+
     public String dimensionWrapper() {
         return dimensionWrapper;
     }
@@ -128,6 +155,21 @@ public final class ChatSettings {
 
     public String separatorColor() {
         return separatorColor;
+    }
+
+    /** 是否启用「装了资源包就交给着色器做原地彩虹」这条分支。 */
+    public boolean packEnabled() {
+        return packEnabled;
+    }
+
+    /** 资源包约定的魔法色；文字被刷成这个颜色时，装着色器会把它渲染成彩虹。 */
+    public String packMagicColor() {
+        return packMagicColor;
+    }
+
+    /** 判定玩家是否装了包：auto=用 API；always=当所有人都装了；never=一律当作没装。 */
+    public String packDetect() {
+        return packDetect;
     }
 
     /** 维度标签文案；主世界 / 下界 / 末地之外的维度用 custom-label 模板（{world} 为世界名）。 */

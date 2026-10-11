@@ -1,0 +1,12 @@
+{
+  "pack": {
+    "description": "§eChatPrefix 彩虹前缀 §7(裁剪自 TheSalt_ 的 Text Effects)",
+    "pack_format": 57,
+    "supported_formats": {
+      "min_inclusive": 57,
+      "max_inclusive": 75
+    },
+    "min_format": 57,
+    "max_format": 75
+  }
+}

@@ -1,4 +1,4 @@
-# ChatPrefix v1.0.0 — Paper 1.21.11 聊天前缀与维度标签插件
+# ChatPrefix v1.2.0 — Paper 1.21.11 聊天前缀与维度标签插件
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -20,14 +20,14 @@
 | --- | --- |
 | 服务端 | Paper 1.21.11（Paper API；不是纯 Spigot/Bukkit） |
 | Java | 21 或更高 |
-| 插件版本 | `1.0.0-1.21.11` |
+| 插件版本 | `1.2.0-1.21.11` |
 
 编译目标是 `paper-api-1.21.11`，用的是 `io.papermc.paper.event.player.AsyncChatEvent` 与 Adventure
 组件，不碰 NMS，因此在 Paper 1.21.x 的小版本更新里照常可用。刻意不依赖 PlaceholderAPI 或任何其他插件。
 
 ## 安装
 
-1. 把 `ChatPrefix-1.0.0-1.21.11.jar` 放进服务端的 `plugins/` 目录。
+1. 把 `ChatPrefix-1.2.0-1.21.11.jar` 放进服务端的 `plugins/` 目录。
 2. 重启服务器（或 `/reload confirm`）。首次启动会生成 `plugins/ChatPrefix/config.yml` 与 `prefixes.yml`。
 3. 给某位玩家设置前缀：`/chatprefix set aaa_ovo 本服`。
 
@@ -66,8 +66,40 @@
 * 传统 `&` 代码：`&c` 红、`&l` 粗体、`&r` 重置；`&&` 表示一个字面 `&`。
 * MiniMessage 标签：`<red>`、`<bold>`、`<gradient:#ff0000:#0000ff>`，也支持 `<#ff8800>` 这种十六进制。
 
+外层方括号自己也会上色（`prefix.color` 留空时的规则）：
+
+* 文字带了颜色 → 方括号跟着变：前括号取文字的**首个**颜色，后括号取**末个**颜色。
+  所以 `/cp set Steve &c大佬` 得到的是整段红色的 `[大佬]`，而不是白括号配红字；
+  `&c红&f白` 这种多色前缀则是 `[红白]`，两边括号各自跟色。
+* 文字完全没颜色 → 方括号保持原样，不额外上色（和以前一致）。
+* config 里配了 `prefix.color` → 方括号和「本身没颜色」的文字一起统一上成该颜色；
+  `prefix.color` 留空才会走上面「跟随文字」的规则。
+
 如果希望 `<`、`>` 保持普通字符，把 `prefix.allow-minimessage` 设为 `false`。
 前缀长度由 `prefix.max-length` 限制（默认 24 个可见字符，按去掉颜色代码后的字符数算，填 `0` 表示不限制）。
+
+#### 彩虹与其它多彩写法
+
+MiniMessage 自带的多彩标签都能直接用（下表颜色是实测值，不是推算）：
+
+| 写法 | 聊天里显示 |
+| --- | --- |
+| `<rainbow>管理员` | 逐字彩虹：管 `#FF0000`、理 `#7FFF00`、员 `#00FFFF` |
+| `<rainbow:2>管理员` | 相位偏移的彩虹（起点 hue 往前挪） |
+| `<rainbow:!>管理员` | 反向彩虹 |
+| `<gradient:#ffb300:#ff3d00>管理员` | 两色线性插值 |
+| `<pride>管理员` | 骄傲旗配色 |
+
+两个实测出来的硬限制，写配置时要留意：
+
+* `<rainbow:N>` 的 N **只能是 0–10 的整数**（1 单位 = 36°，10 = 一整圈）。写 `<rainbow:0.5>` 会失效，
+  客户端会把 `<rainbow:0.5>` 原样显示出来；写负数则直接报错。
+* **Minecraft 聊天行发出后客户端就定死了，插件无法原地改那一行的颜色**。所以真正的“动画”只能靠
+  逐条消息推进相位：每发一条消息颜色往前滚一格。
+
+`prefix.rainbow.animate: true`（默认）时，前缀里的裸 `<rainbow>` 会被插件换成带当前相位的
+`<rainbow:N>`，于是每条消息的彩虹起点都不同；`speed` 控制每秒推进多少格（10 格 = 一整圈）。
+写 `<rainbow:2>` 这种**带参数**的写法不受影响，永远是固定相位。
 
 ## 配置
 
@@ -80,7 +112,10 @@ format: "{prefix}{dimension}{name}{separator}{message}"
 prefix:
   default: ""            # 没设置前缀时显示什么；空串 = 这一整段不显示
   wrapper: "[{text}]"    # {text} 是 op 输入的原文字
-  color: ""              # 前缀默认颜色；空串 = 不额外上色
+  color: ""              # 前缀默认颜色；空串 = 方括号跟随文字颜色，见「前缀文字的写法」
+  rainbow:
+    animate: true        # 前缀里的裸 <rainbow> 是否随时间流动（每条消息相位不同）
+    speed: 1.0           # 每秒推进多少格相位；10 格 = 一整圈
   allow-minimessage: true
   max-length: 24         # 可见字符数上限，0 = 不限制
 
@@ -104,18 +139,57 @@ name:
 separator:
   text: " » "
   color: "gray"
+
+# 资源包侧的真·原地彩虹；见「资源包：真·原地彩虹」。关掉则一律走逐消息相位彩虹。
+pack:
+  enabled: true
+  magic-color: "#F8F85C"   # 必须与资源包 _config.glsl 里 TEXT_EFFECT 的触发色一致
+  detect: auto             # auto = 用 API 判定；always = 当所有人都装了；never = 一律当作没装
 ```
 
 说明：
 
 * 颜色可以写命名颜色（`gray`、`red`、`gold`、`light_purple` …）或 `#rrggbb`。
-* `prefix.color` / `name.color` 只给**本身没有颜色**的部分补色：前缀写成 `&c大佬` 时，即使
-  `prefix.color` 是 `gold` 也还是红色。
+* `prefix.color` / `name.color` 只给**本身没有颜色**的部分补色。前缀写成 `&c大佬` 时文字始终是红色：
+  `prefix.color` 留空则方括号跟着文字变红，配成 `gold` 则方括号用 gold（显式配置优先）。
 * `name.color` 默认留空是有意的：给名字上色会盖掉计分板队伍颜色。
 * `prefix.default` 留空即「没有前缀就什么都不显示」；把它改成 `滚木`，没设置前缀的玩家就会显示 `[滚木]`。
 * 玩家名与聊天内容从不做 MiniMessage 解析，玩家无法通过聊天注入格式或点击事件；
   只有配置文本和 op 输入的前缀会被解析。
 * 如果 `prefix.wrapper` 里漏写了 `{text}`，前缀文字会不加包裹直接显示，而不是被悄悄丢掉。
+
+## 资源包：真·原地彩虹（可选）
+
+聊天行一旦发出，客户端就把它定死了，插件无法原地改色 —— 所以 `prefix.rainbow` 做出来的「流动」
+本质是逐条消息推进相位。想要**真正的原地动画**，只能让客户端的内核着色器参与。
+
+`resourcepack/` 里是一个裁剪版资源包，派生自 TheSalt_ 的 Text Effects（MIT）。它覆盖
+`rendertype_text` 核心着色器，把颜色 `#F8F85C` 渲染成持续滚动的彩虹。
+
+```powershell
+cd resourcepack
+.\build-pack.ps1     # 产物：dist\ChatPrefix-Rainbow-1.2.0.zip，同时打印 sha1
+```
+
+生效链路：
+
+1. 把 zip 下发给玩家（`server.properties` 的 `resource-pack=` + `resource-pack-sha1=`，
+   或用 Paper 的资源包配置）。
+2. 插件对**装了包的玩家**把它看到的前缀整段刷成 `#F8F85C`，由着色器渲染成原地流动的彩虹；
+   **没装包的玩家完全不受影响**，仍是逐消息相位彩虹。
+3. 只有裸 `<rainbow>` 才会走这条分支；`<rainbow:2>` 这种带相位的写法表示「要固定彩虹」，两条路径一致。
+
+判定玩家装没装包用 `pack.detect`：`auto`（默认，用 Bukkit/Paper API）、`always`（当所有人都装了，
+服务器强制下发时用）、`never`（一律当作没装）。
+
+注意：
+
+* 这个包覆盖 `rendertype_text`，**与任何同样覆盖该着色器的资源包互斥**。
+* `pack.mcmeta` 的范围锁在 `min_format`/`max_format` = 57–75，即 Minecraft 1.21.6–1.21.11。
+* 许可为 MIT，`resourcepack/LICENSE-Text_Effects.txt` 必须随包保留；派生说明见
+  `resourcepack/CREDITS.md`。
+* **尚未做真机验证**：着色器接口与原版 1.21.11 已逐项比对通过（见 CREDITS.md），
+  但「玩家装上包后实际看到的画面」需要有人进服确认，离线测试覆盖不到这一步。
 
 ## 从源码构建
 
@@ -123,7 +197,7 @@ separator:
 
 ```powershell
 cd 1.21.11
-.\build.ps1          # 产物：dist\ChatPrefix-1.0.0-1.21.11.jar
+.\build.ps1          # 产物：dist\ChatPrefix-1.2.0-1.21.11.jar
 ```
 
 `build.ps1` 用 JDK 21 编译（`--release 21`），把 `build/classes` 与 `resources/*` 打进 jar。
@@ -145,20 +219,21 @@ cd 1.21.11
 
 ```powershell
 cd tests
-.\run-tests.ps1      # 39 条离线断言，不需要服务器
+.\run-tests.ps1      # 70 条离线断言，不需要服务器
 .\smoke-test.ps1     # 在 .testserver\12111 起真实 Paper 1.21.11，用控制台喂指令验证
 ```
 
 `run-tests.ps1` 用 `ChatFormatter` 渲染聊天行，断言精确的纯文本与颜色，覆盖：有/无前缀、三种维度、
-自定义维度、`&` 与 MiniMessage 解析、颜色优先级、自定义模板、长度计算，以及「玩家消息与玩家名不被解析」。
+自定义维度、`&` 与 MiniMessage 解析、方括号跟随文字颜色、彩虹相位流动、资源包魔法色分支、
+颜色优先级、自定义模板、长度计算，以及「玩家消息与玩家名不被解析」。
 
 `smoke-test.ps1` 首次运行会下载 Paper 1.21.11 服务端 jar（若本机已有缓存的原版 jar 会自动复用），
 装上插件并启动服务器，再从控制台日志核对：插件是否启用、`/cp list|get|remove|set|reload` 是否符合预期、
 `config.yml` 与 `prefixes.yml` 是否按预期生成与写回。
 
-### 验证状态（2026-10-04）
+### 验证状态（2026-10-11）
 
-* 离线断言 39/39 通过。
+* 离线断言 70/70 通过（8 条覆盖方括号跟随文字颜色，9 条覆盖彩虹相位流动，14 条覆盖资源包魔法色分支）。
 * 真机 Paper 1.21.11（build 132）+ Java 21：`api-version: '1.21'` 通过加载，插件正常启用，所有指令都有正确回应，
   `prefixes.yml` 能正确往返中文前缀与 `&` 颜色代码。
 * 尚未验证：真人玩家在客户端里看到的聊天行样式。控制台驱动的冒烟测试造不出真实玩家消息，

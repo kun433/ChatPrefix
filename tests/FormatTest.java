@@ -23,6 +23,8 @@ public final class FormatTest {
     private static int passed;
     private static int failed;
     private static final List<String> failures = new ArrayList<>();
+    /** 与 config.yml 的 pack.magic-color、资源包 _config.glsl 里的触发色一致。 */
+    private static final TextColor MAGIC = TextColor.color(0xF8F85C);
 
     public static void main(String[] args) {
         ChatSettings defaults = ChatSettings.defaults();
@@ -104,12 +106,62 @@ public final class FormatTest {
         eqColor("前缀文字 &c = red", NamedTextColor.RED, colorOf(colored, "(本服)"));
         eqColor("末地标签 = light_purple", NamedTextColor.LIGHT_PURPLE, colorOf(colored, "末地"));
         eqColor("分隔符 = gray", NamedTextColor.GRAY, colorOf(colored, " » "));
-        eqColor("没配 prefix.color 时方括号不上色", null, colorOf(formatter.prefix("&c(本服)"), "["));
+        eqColor("方括号跟随文字颜色：&c 时 [ 也变红", NamedTextColor.RED, colorOf(formatter.prefix("&c(本服)"), "["));
+        eqColor("方括号跟随文字颜色：&c 时 ] 也变红", NamedTextColor.RED, colorOf(formatter.prefix("&c(本服)"), "]"));
+        eqColor("MiniMessage <red> 同样让方括号变红", NamedTextColor.RED, colorOf(formatter.prefix("<red>(本服)"), "["));
+        eqColor("文字本身没有颜色时方括号保持原样", null, colorOf(formatter.prefix("(本服)"), "["));
+        Component mixed = formatter.prefix("&cA&fB");
+        eqColor("多色前缀：前括号取文字首个颜色", NamedTextColor.RED, colorOf(mixed, "["));
+        eqColor("多色前缀：后括号取文字末个颜色", NamedTextColor.WHITE, colorOf(mixed, "]"));
+        eqColor("prefix.color 优先于方括号跟随", NamedTextColor.GOLD,
+                colorOf(new ChatFormatter(settings("prefix.color", "gold")).prefix("&c(本服)"), "["));
+        eqColor("prefix.color 不改写文字自带颜色", NamedTextColor.RED,
+                colorOf(new ChatFormatter(settings("prefix.color", "gold")).prefix("&c(本服)"), "(本服)"));
 
         Component tinted = new ChatFormatter(settings("prefix.color", "gold", "prefix.max-length", 24))
                 .render("本服", World.Environment.NORMAL, "world", formatter.name("aaa_ovo"), Component.text("hi"));
         eqColor("prefix.color 生效时不覆盖文字自带颜色", NamedTextColor.GOLD, colorOf(tinted, "本服"));
         eqColor("维度默认绿色保留", NamedTextColor.GREEN, colorOf(tinted, "主世界"));
+
+        System.out.println();
+        System.out.println("== 彩虹前缀的相位流动 ==");
+        Component rainbow0 = formatter.prefix("<rainbow>abcd", 0);
+        Component rainbow2 = formatter.prefix("<rainbow>abcd", 2);
+        eq("彩虹前缀的纯文本", "[abcd]", plain(rainbow0));
+        eqChar("帧 0 / 相位 0：第 1 个字 = 红", "a", TextColor.color(0xFF0000), 1, rainbow0);
+        eqChar("帧 1 / 相位 2：同一个字换到 #CBFF00", "a", TextColor.color(0xCBFF00), 1, rainbow2);
+        eqChar("相位 0：最后一个字 = #7F00FF", "d", TextColor.color(0x7F00FF), 4, rainbow0);
+        eqChar("方括号跟首个字同色", "[", TextColor.color(0xFF0000), 0, rainbow0);
+        eqChar("方括号跟末个字同色", "]", TextColor.color(0x7F00FF), 5, rainbow0);
+        eqChar("相位 10 与 0 等价（一整圈）", "a", TextColor.color(0xFF0000), 1,
+                formatter.prefix("<rainbow>abcd", 10));
+        eqChar("带相位的 <rainbow:2> 不受动画影响", "a", TextColor.color(0xCBFF00), 1,
+                formatter.prefix("<rainbow:2>abcd", 7));
+        eq("allow-minimessage=false 时彩虹标签只是普通文字", "[<rainbow>abcd]",
+                plain(new ChatFormatter(settings("prefix.allow-minimessage", false)).prefix("<rainbow>abcd", 3)));
+
+        System.out.println();
+        System.out.println("== 资源包魔法色分支 ==");
+        Component packPrefix = formatter.prefix("<rainbow>abcd", 0, true);
+        eq("装了包时 <rainbow> 的纯文本不变", "[abcd]", plain(packPrefix));
+        eqChar("装了包：前括号 = 魔法色", "[", MAGIC, 0, packPrefix);
+        eqChar("装了包：第 1 个字 = 魔法色", "a", MAGIC, 1, packPrefix);
+        eqChar("装了包：最后一个字 = 魔法色", "d", MAGIC, 4, packPrefix);
+        eqChar("装了包：后括号 = 魔法色", "]", MAGIC, 5, packPrefix);
+        eqChar("装了包但前缀没写 <rainbow>：颜色不动", "大", NamedTextColor.RED, 1,
+                formatter.prefix("&c大佬", 0, true));
+        eqChar("带相位的 <rainbow:2> 不交给资源包", "a", TextColor.color(0xCBFF00), 1,
+                formatter.prefix("<rainbow:2>abcd", 0, true));
+        eqChar("pack.enabled=false 时不做魔法色替换", "a", TextColor.color(0xFF0000), 1,
+                new ChatFormatter(settings("pack.enabled", false)).prefix("<rainbow>abcd", 0, true));
+        eqChar("pack.magic-color 可改", "a", TextColor.color(0x123456), 1,
+                new ChatFormatter(settings("pack.magic-color", "#123456")).prefix("<rainbow>abcd", 0, true));
+        eq("wantsRainbow(<rainbow>x)", "true", String.valueOf(Text.wantsRainbow("<rainbow>x")));
+        eq("wantsRainbow(<RAINBOW>x)", "true", String.valueOf(Text.wantsRainbow("<RAINBOW>x")));
+        eq("wantsRainbow(<rainbow:2>x)", "false", String.valueOf(Text.wantsRainbow("<rainbow:2>x")));
+        eq("wantsRainbow(&cx)", "false", String.valueOf(Text.wantsRainbow("&cx")));
+        eqChar("forceColor 覆盖已有颜色", "管", MAGIC, 0,
+                Text.forceColor(Text.parse("<green>管理员", true), Text.color("#F8F85C")));
 
         System.out.println();
         System.out.println("== 模板与配置项 ==");
@@ -162,6 +214,10 @@ public final class FormatTest {
                 plain(new ChatFormatter(settings("prefix.allow-minimessage", false))
                         .render("<red>本服", World.Environment.THE_END, "world_the_end",
                                 formatter.name("aaa_ovo"), Component.text("hi"))));
+
+        eqColor("allow-minimessage=false 不影响 & 颜色代码",
+                NamedTextColor.RED,
+                colorOf(new ChatFormatter(settings("prefix.allow-minimessage", false)).prefix("&c本服"), "本服"));
 
         eqColor("name.color = aqua", NamedTextColor.AQUA,
                 new ChatFormatter(settings("name.color", "aqua")).name("aaa_ovo").color());
@@ -242,6 +298,36 @@ public final class FormatTest {
 
     private static void eqInt(String label, int expected, int actual) {
         eq(label, String.valueOf(expected), String.valueOf(actual));
+    }
+
+    /** 断言第 index 个可见字符以及它的颜色，用来把彩虹前缀逐字钉死。 */
+    private static void eqChar(String label, String expectedChar, TextColor expectedColor, int index,
+                               Component component) {
+        List<String> chars = new ArrayList<>();
+        List<TextColor> colors = new ArrayList<>();
+        flatten(component, chars, colors);
+        String actualChar = index < chars.size() ? chars.get(index) : "<越界>";
+        TextColor actualColor = index < colors.size() ? colors.get(index) : null;
+        String expected = expectedChar + ":" + (expectedColor == null ? "无" : expectedColor.asHexString());
+        String actual = actualChar + ":" + (actualColor == null ? "无" : actualColor.asHexString());
+        eq(label, expected, actual);
+    }
+
+    /** 展平成一串「字符 + 颜色」：节点自身的直接文本算作自己的颜色，子节点递归在后。 */
+    private static void flatten(Component component, List<String> chars, List<TextColor> colors) {
+        String full = plain(component);
+        StringBuilder kids = new StringBuilder();
+        for (Component child : component.children()) {
+            kids.append(plain(child));
+        }
+        String direct = full.substring(0, full.length() - kids.length());
+        for (int i = 0; i < direct.length(); i++) {
+            chars.add(String.valueOf(direct.charAt(i)));
+            colors.add(component.style().color());
+        }
+        for (Component child : component.children()) {
+            flatten(child, chars, colors);
+        }
     }
 
     private static void eqColor(String label, TextColor expected, TextColor actual) {

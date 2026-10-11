@@ -47,8 +47,29 @@ public final class ChatFormatter {
      */
     public Component render(String prefixRaw, World.Environment environment, String worldName,
                             Component name, Component message) {
+        return render(prefixRaw, environment, worldName, name, message, 0, false);
+    }
+
+    /**
+     * 渲染一整行聊天，并指定彩虹相位。
+     *
+     * @param rainbowPhase 0-9 的整数相位，只有前缀里的裸 &lt;rainbow&gt; 会受影响；0 表示不动
+     */
+    public Component render(String prefixRaw, World.Environment environment, String worldName,
+                            Component name, Component message, int rainbowPhase) {
+        return render(prefixRaw, environment, worldName, name, message, rainbowPhase, false);
+    }
+
+    /**
+     * 渲染一整行聊天，并区分接收者是否装了资源包。
+     *
+     * @param rainbowPhase 0-9 的整数相位，只有前缀里的裸 &lt;rainbow&gt; 会受影响；0 表示不动
+     * @param packViewer   这个接收者是否装了资源包（装了则彩虹交给着色器，见 {@link #prefix})
+     */
+    public Component render(String prefixRaw, World.Environment environment, String worldName,
+                            Component name, Component message, int rainbowPhase, boolean packViewer) {
         Map<String, Component> parts = new LinkedHashMap<>();
-        parts.put("prefix", prefix(prefixRaw));
+        parts.put("prefix", prefix(prefixRaw, rainbowPhase, packViewer));
         parts.put("dimension", dimension(environment, worldName));
         parts.put("name", name == null ? Component.empty() : name);
         parts.put("separator", separator());
@@ -56,19 +77,68 @@ public final class ChatFormatter {
         return template(settings.format(), parts);
     }
 
-    /** 前缀段；未设置或配置为空白时不显示。 */
     public Component prefix(String prefixRaw) {
+        return prefix(prefixRaw, 0, false);
+    }
+
+    public Component prefix(String prefixRaw, int rainbowPhase) {
+        return prefix(prefixRaw, rainbowPhase, false);
+    }
+
+    /**
+     * 前缀段；未设置或配置为空白时不显示。
+     *
+     * <p>上色优先级：文字自带的颜色代码 &gt; prefix.color &gt; 方括号跟随相邻文字颜色。
+     * 即 {@code /cp set Steve &c大佬} 会得到整段红色的 {@code [大佬]}：文字是红的，
+     * 外层方括号跟着变红（前括号取文字首个颜色，后括号取末个颜色），而不是白括号配红字。
+     *
+     * <p>{@code rainbowPhase} 非 0 时，文字里的裸 {@code <rainbow>} 会被换成带相位的
+     * {@code <rainbow:N>}，于是每条消息的彩虹起点不同，看起来像在流动。
+     *
+     * <p>{@code packViewer} 为 true 表示这个接收者装了资源包：此时若前缀本来就写了裸
+     * {@code <rainbow>}，整段（含方括号）会被刷成资源包约定的魔法色，交由 rendertype_text
+     * 着色器做**原地**流动；没装包的接收者仍走上面的逐消息相位彩虹。
+     */
+    public Component prefix(String prefixRaw, int rainbowPhase, boolean packViewer) {
         String raw = prefixRaw == null ? settings.prefixDefault() : prefixRaw;
         if (raw == null || raw.isBlank()) {
             return Component.empty();
         }
-        Component body = Text.parse(raw, settings.prefixAllowMiniMessage());
+        Component body = Text.parse(raw, settings.prefixAllowMiniMessage(), rainbowPhase);
         String wrapper = settings.prefixWrapper();
+        String configured = settings.prefixColor();
         if (wrapper == null || !wrapper.contains("{text}")) {
             // 包裹格式写错时宁可直接显示文字，也不要让 op 设置的前缀凭空消失
-            wrapper = "{text}";
+            return magicColor(raw, packViewer, Text.tint(body, configured));
         }
-        return Text.tint(template(wrapper, Map.of("text", body)), settings.prefixColor());
+        if (configured != null && !configured.isBlank()) {
+            // prefix.color 已明确指定：整段（含方括号）统一上色，文字自带的颜色仍然优先
+            return magicColor(raw, packViewer, Text.tint(template(wrapper, Map.of("text", body)), configured));
+        }
+        int first = wrapper.indexOf("{text}");
+        if (first != wrapper.lastIndexOf("{text}")) {
+            // wrapper 里写了多个 {text} 属于异常配置，退回「只管文字、不动括号」
+            return magicColor(raw, packViewer, template(wrapper, Map.of("text", body)));
+        }
+        // 没配 prefix.color：方括号跟随相邻文字的颜色，文字本身没有颜色时保持不变
+        int end = first + "{text}".length();
+        Component segment = Component.empty()
+                .append(Text.tint(Text.parse(wrapper.substring(0, first), true), Text.firstColor(body)))
+                .append(body)
+                .append(Text.tint(Text.parse(wrapper.substring(end), true), Text.lastColor(body)));
+        return magicColor(raw, packViewer, segment);
+    }
+
+    /**
+     * 装了资源包、且这个前缀本来就写了裸 {@code <rainbow>} 时，把整段刷成魔法色交着色器处理；
+     * 否则原样返回。只有裸 {@code <rainbow>} 算数，{@code <rainbow:2>} 这种显式相位表示「要固定彩虹」，
+     * 与逐消息相位那条规则保持一致。
+     */
+    private Component magicColor(String raw, boolean packViewer, Component segment) {
+        if (!packViewer || !settings.packEnabled() || !Text.wantsRainbow(raw)) {
+            return segment;
+        }
+        return Text.forceColor(segment, Text.color(settings.packMagicColor()));
     }
 
     /** 维度段：主世界 / 下界 / 末地 / 自定义世界名，所有玩家都会有。 */
