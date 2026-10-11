@@ -67,7 +67,9 @@ pack:
   # 默认值对应 resourcepack/ 里的 apply_rainbow()，不要随手改
   magic-color: "#F8F85C"
   # 怎么判定玩家装没装包：
-  #   auto   = 用 Bukkit/Paper API（hasResourcePack / getResourcePackStatus）
-  #   always = 当所有人都装了（服务器强制下发资源包、而又不想依赖上面那个判定时用）
+  #   auto   = 先看客户端上报的资源包状态事件，再看 hasResourcePack / getResourcePackStatus。
+  #            注意：玩家自己把 zip 放进 resourcepacks 文件夹时，服务端无从得知，auto 必然判为没装。
+  #   always = 当所有人都装了（服务器强制下发、或你在手动装包测试时用这个）
   #   never  = 一律当作没装
+  # 不确定时进游戏执行 /cp pack，它会打印每一步的判定结果。
   detect: auto

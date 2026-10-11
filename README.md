@@ -1,4 +1,4 @@
-# ChatPrefix v1.2.0 — Chat Prefix and Dimension Tag for Paper 1.21.11
+# ChatPrefix v1.2.1 — Chat Prefix and Dimension Tag for Paper 1.21.11
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -21,7 +21,7 @@ player is in.
 | --- | --- |
 | Server | Paper 1.21.11 (Paper API, not Spigot/Bukkit-only) |
 | Java | 21 or newer |
-| Plugin version | `1.2.0-1.21.11` |
+| Plugin version | `1.2.1-1.21.11` |
 
 The plugin is built against `paper-api-1.21.11` and uses `io.papermc.paper.event.player.AsyncChatEvent`
 plus Adventure components. It does not use NMS, so it keeps working across Paper 1.21.x patch
@@ -29,7 +29,7 @@ releases. There is deliberately no dependency on PlaceholderAPI or any other plu
 
 ## Install
 
-1. Drop `ChatPrefix-1.2.0-1.21.11.jar` into the server's `plugins/` folder.
+1. Drop `ChatPrefix-1.2.1-1.21.11.jar` into the server's `plugins/` folder.
 2. Restart the server (or `/reload confirm`). `plugins/ChatPrefix/config.yml` and
    `prefixes.yml` are created on first start.
 3. Give an operator the prefix: `/chatprefix set aaa_ovo 本服`.
@@ -49,6 +49,7 @@ Everything is under one command, `chatprefix` (alias `cp`), and requires the
 | `/cp remove <player>` | Clears the prefix; the player then shows no prefix segment. |
 | `/cp get <player>` | Shows the stored prefix, rendered as it appears in chat. |
 | `/cp list` | Lists every stored prefix (up to 100 lines). |
+| `/cp pack` | Prints your own resource-pack detection details (run this first when the rainbow does nothing). |
 | `/cp reload` | Reloads `config.yml` and `prefixes.yml` without restarting the server. |
 | `/cp help` | Shows the usage summary. |
 
@@ -160,7 +161,7 @@ separator:
 pack:
   enabled: true
   magic-color: "#F8F85C"   # must match the TEXT_EFFECT trigger colour in the pack's _config.glsl
-  detect: auto             # auto = ask the API; always = assume everyone has it; never = assume nobody
+  detect: auto             # auto = events + API; always = assume everyone has it; never = assume nobody
 ```
 
 Notes:
@@ -192,6 +193,9 @@ cd resourcepack
 .\build-pack.ps1     # -> dist\ChatPrefix-Rainbow-1.2.0.zip, and prints the sha1
 ```
 
+The pack itself has not changed since 1.2.0, so it stays at 1.2.0; the plugin version moves
+independently of it.
+
 How it fits together:
 
 1. Deliver the zip to players (via `server.properties` `resource-pack=` plus `resource-pack-sha1=`,
@@ -202,9 +206,10 @@ How it fits together:
 3. Only a bare `<rainbow>` takes this branch. A tag with an explicit phase such as `<rainbow:2>`
    means "a fixed rainbow", consistently in both paths.
 
-Whether a player has the pack is decided by `pack.detect`: `auto` (the default, asks the
-Bukkit/Paper API), `always` (assume everyone has it — useful when the server forces the pack), or
-`never` (assume nobody does).
+Whether a player has the pack is decided by `pack.detect`: `auto` (the default — it first looks at
+the resource-pack status events the client reports, then falls back to the Bukkit/Paper API),
+`always` (assume everyone has it — useful when the server forces the pack, or while you are testing
+by hand), or `never` (assume nobody does).
 
 Caveats:
 
@@ -217,13 +222,36 @@ Caveats:
   1.21.11 (see CREDITS.md), but what a real player actually sees with the pack enabled needs
   somebody to join and look — offline tests cannot cover that.
 
+### Pack installed but the rainbow still does not move? Run `/cp pack`
+
+Two easy traps sit on that path:
+
+1. **The server must run plugin 1.2.1 or newer.** 1.2.0 had this branch too, but its `auto` check
+   only asked the API; 1.2.1 also records the resource-pack status events the client reports. If
+   `plugins/ChatPrefix/config.yml` has no `pack:` section at all, the server is running an old jar.
+2. **A pack installed by hand on the client is invisible to the server.** If you just drop the zip
+   into the client's `resourcepacks` folder, nothing tells the server about it, so `auto` will
+   always say "not installed" — set `pack.detect: always` for that case.
+
+`/cp pack` prints every step: plugin version, the three `pack.*` settings, the last resource-pack
+status event, `hasResourcePack()`, `getResourcePackStatus()`, the final verdict, and your own raw
+prefix text.
+
+What you see in chat tells you which problem it is:
+
+| In chat you see | Meaning |
+| --- | --- |
+| A **solid** yellow-green prefix (`#F8F85C`) | The magic colour is applied but the client has no pack → the pack failed to load, or detection got it wrong |
+| A **static** rainbow prefix | The magic colour was not applied; the plugin took the per-message phase path → read the verdict from `/cp pack` |
+| A prefix that **scrolls in place** | Working |
+
 ## Build from source
 
 Only a JDK is needed — there is no Maven/Gradle build.
 
 ```powershell
 cd 1.21.11
-.\build.ps1          # -> dist\ChatPrefix-1.2.0-1.21.11.jar
+.\build.ps1          # -> dist\ChatPrefix-1.2.1-1.21.11.jar
 ```
 
 `build.ps1` compiles with JDK 21 (`--release 21`) and packs `build/classes` plus `resources/*`

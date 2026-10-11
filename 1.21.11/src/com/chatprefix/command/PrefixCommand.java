@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.UUID;
 
 import com.chatprefix.ChatPrefix;
+import com.chatprefix.chat.ChatSettings;
 import com.chatprefix.chat.PrefixStore;
 import com.chatprefix.util.Text;
 
@@ -20,6 +21,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 
 /**
  * /chatprefix —— op 给玩家设置聊天前缀。
@@ -32,7 +34,7 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
     private static final String PREFIX = "[聊天前缀] ";
     private static final int LIST_LIMIT = 100;
 
-    private static final List<String> SUBCOMMANDS = List.of("set", "remove", "get", "list", "reload", "help");
+    private static final List<String> SUBCOMMANDS = List.of("set", "remove", "get", "list", "pack", "reload", "help");
 
     private final ChatPrefix plugin;
 
@@ -61,6 +63,8 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
                 return get(sender, label, args);
             case "list":
                 return list(sender);
+            case "pack":
+                return packDiagnostics(sender);
             case "reload":
                 return reload(sender);
             case "help":
@@ -176,6 +180,45 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    /**
+     * /cp pack —— 把「你这个客户端算不算装了资源包」的每一步都摊开，
+     * 用来排查「装了包但前缀没变成原地彩虹」。
+     */
+    private boolean packDiagnostics(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            reply(sender, Component.text("这条要看执行者自己的客户端状态，请在游戏里执行。", NamedTextColor.RED));
+            return true;
+        }
+        ChatSettings current = plugin.settings();
+        reply(sender, Component.text("资源包判定诊断：", NamedTextColor.GRAY));
+
+        line(sender, "插件版本", plugin.getDescription().getVersion());
+        line(sender, "pack.enabled", String.valueOf(current.packEnabled()));
+        line(sender, "pack.detect", current.packDetect());
+        line(sender, "pack.magic-color", current.packMagicColor());
+
+        PlayerResourcePackStatusEvent.Status tracked = plugin.trackedPackStatus(player.getUniqueId());
+        line(sender, "最近一次状态事件", tracked == null ? "（从未上报，客户端手动装包时这是正常的）" : tracked.name());
+        line(sender, "Player#hasResourcePack()", String.valueOf(player.hasResourcePack()));
+        PlayerResourcePackStatusEvent.Status api = player.getResourcePackStatus();
+        line(sender, "Player#getResourcePackStatus()", api == null ? "null" : api.name());
+
+        boolean viewer = plugin.packViewer(player);
+        line(sender, "最终判定", viewer
+                ? "算作装了包 → 前缀会刷成魔法色交给着色器"
+                : "算作没装包 → 走逐消息相位彩虹（想强制走资源包就把 pack.detect 改成 always）");
+
+        String prefix = plugin.store().prefixOf(player.getUniqueId());
+        line(sender, "你当前的前缀原文", prefix == null ? "（没设置）" : prefix);
+        line(sender, "该前缀是否写了裸 <rainbow>", String.valueOf(Text.wantsRainbow(prefix)));
+        return true;
+    }
+
+    private static void line(CommandSender sender, String key, String value) {
+        sender.sendMessage(Component.text("  " + key + "：", NamedTextColor.DARK_GRAY)
+                .append(Component.text(value, NamedTextColor.WHITE)));
+    }
+
     private boolean reload(CommandSender sender) {
         plugin.reloadAll();
         reply(sender, Component.text("已重载 config.yml 与 prefixes.yml，当前 " + plugin.store().size() + " 条前缀。", NamedTextColor.GREEN));
@@ -188,6 +231,7 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(usage(label + " remove <玩家>", "取消前缀，之后聊天里不显示前缀段"));
         sender.sendMessage(usage(label + " get <玩家>", "查看某位玩家当前的前缀"));
         sender.sendMessage(usage(label + " list", "列出所有已设置的前缀"));
+        sender.sendMessage(usage(label + " pack", "看你自己的资源包判定细节（彩虹没生效时先跑这个）"));
         sender.sendMessage(usage(label + " reload", "重载 config.yml 与 prefixes.yml"));
     }
 

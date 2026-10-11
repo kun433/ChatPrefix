@@ -2,6 +2,9 @@ package com.chatprefix;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.chatprefix.chat.ChatFormatter;
 import com.chatprefix.chat.ChatSettings;
@@ -17,6 +20,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -32,6 +36,12 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
     private volatile PrefixStore store;
     private volatile ChatFormatter formatter;
     private volatile ChatSettings settings;
+
+    /**
+     * 玩家最近一次上报的资源包状态。客户端把包手动放进 resourcepacks 文件夹时服务端是看不到的，
+     * 但只要服务器下发过包，这个事件就会带着真实结果回来，比 Player#hasResourcePack() 可靠。
+     */
+    private final Map<UUID, PlayerResourcePackStatusEvent.Status> packStatus = new ConcurrentHashMap<>();
 
     @Override
     public void onEnable() {
@@ -50,7 +60,11 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
             command.setTabCompleter(executor);
         }
 
-        getLogger().info("已启用：前缀 " + store.size() + " 条，模板 " + settings.format());
+        getLogger().info("已启用 ChatPrefix " + getDescription().getVersion()
+                + "：前缀 " + store.size() + " 条，模板 " + settings.format()
+                + "；资源包分支 " + (settings.packEnabled()
+                        ? "开（检测 " + settings.packDetect() + "，魔法色 " + settings.packMagicColor() + "）"
+                        : "关"));
     }
 
     @Override
@@ -110,18 +124,17 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
                     : current.name(source.getName());
             // 装没装资源包是按接收者算的：装了的人看到着色器做的原地彩虹，没装的回落逐消息相位彩虹
             return current.render(prefixRaw, environment, worldName, name, message,
-                    rainbowPhase, viewerHasPack(viewer));
+                    rainbowPhase, packViewer(viewer));
         });
     }
 
     /**
      * 这个接收者是否应按「装了资源包」渲染。
      *
-     * <p>detect 取 auto 时用 Bukkit/Paper 的判定；取 always 时当所有人都装了
-     * （服务器用 server.properties / Paper 强制下发资源包时可以用它绕过判定不准的情况）；
-     * 取 never 时一律当作没装。
+     * <p>detect 取 auto 时用事件上报结果与 Bukkit/Paper 的 API 综合判断；取 always 时当所有人都装了
+     * （服务器强制下发资源包、或客户端手动装包服务端看不到时可以用它）；取 never 时一律当作没装。
      */
-    private boolean viewerHasPack(Audience viewer) {
+    public boolean packViewer(Audience viewer) {
         ChatSettings current = settings;
         if (current == null || !current.packEnabled()) {
             return false;
@@ -136,8 +149,45 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
         if (!(viewer instanceof Player player)) {
             return false;
         }
+        return packViewer(player);
+    }
+
+    /** 同一套判定的玩家版本，/cp pack 复用。 */
+    public boolean packViewer(Player player) {
+        PlayerResourcePackStatusEvent.Status tracked = packStatus.get(player.getUniqueId());
+        if (tracked != null) {
+            // 事件是最新的真实结果，优先信它；还在下载中的状态则继续问 API
+            if (tracked == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED) {
+                return true;
+            }
+            if (tracked != PlayerResourcePackStatusEvent.Status.ACCEPTED
+                    && tracked != PlayerResourcePackStatusEvent.Status.DOWNLOADED) {
+                return false;
+            }
+        }
         return player.hasResourcePack()
                 || player.getResourcePackStatus() == PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED;
+    }
+
+    /** 最近一次上报的资源包状态；没上报过返回 null。 */
+    public PlayerResourcePackStatusEvent.Status trackedPackStatus(UUID playerId) {
+        return playerId == null ? null : packStatus.get(playerId);
+    }
+
+    @EventHandler
+    public void onResourcePackStatus(PlayerResourcePackStatusEvent event) {
+        PlayerResourcePackStatusEvent.Status status = event.getStatus();
+        if (status == null) {
+            packStatus.remove(event.getPlayer().getUniqueId());
+        } else {
+            packStatus.put(event.getPlayer().getUniqueId(), status);
+        }
+    }
+
+    /** 退出时清掉记录，避免记录跟着 UUID 一直留着。 */
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        packStatus.remove(event.getPlayer().getUniqueId());
     }
 
     /**

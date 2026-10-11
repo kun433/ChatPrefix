@@ -1,4 +1,4 @@
-# ChatPrefix v1.2.0 — Paper 1.21.11 聊天前缀与维度标签插件
+# ChatPrefix v1.2.1 — Paper 1.21.11 聊天前缀与维度标签插件
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -20,14 +20,14 @@
 | --- | --- |
 | 服务端 | Paper 1.21.11（Paper API；不是纯 Spigot/Bukkit） |
 | Java | 21 或更高 |
-| 插件版本 | `1.2.0-1.21.11` |
+| 插件版本 | `1.2.1-1.21.11` |
 
 编译目标是 `paper-api-1.21.11`，用的是 `io.papermc.paper.event.player.AsyncChatEvent` 与 Adventure
 组件，不碰 NMS，因此在 Paper 1.21.x 的小版本更新里照常可用。刻意不依赖 PlaceholderAPI 或任何其他插件。
 
 ## 安装
 
-1. 把 `ChatPrefix-1.2.0-1.21.11.jar` 放进服务端的 `plugins/` 目录。
+1. 把 `ChatPrefix-1.2.1-1.21.11.jar` 放进服务端的 `plugins/` 目录。
 2. 重启服务器（或 `/reload confirm`）。首次启动会生成 `plugins/ChatPrefix/config.yml` 与 `prefixes.yml`。
 3. 给某位玩家设置前缀：`/chatprefix set aaa_ovo 本服`。
 
@@ -44,6 +44,7 @@
 | `/cp remove <玩家>` | 取消前缀，之后该玩家不显示前缀段。 |
 | `/cp get <玩家>` | 查看已存的前缀，并按聊天里的实际效果渲染出来。 |
 | `/cp list` | 列出所有已设置的前缀（最多 100 条）。 |
+| `/cp pack` | 打印你自己的资源包判定细节（刷新前缀的彩虹没生效时先跑这个）。 |
 | `/cp reload` | 重载 `config.yml` 与 `prefixes.yml`，不用重启服务器。 |
 | `/cp help` | 显示用法。 |
 
@@ -144,7 +145,7 @@ separator:
 pack:
   enabled: true
   magic-color: "#F8F85C"   # 必须与资源包 _config.glsl 里 TEXT_EFFECT 的触发色一致
-  detect: auto             # auto = 用 API 判定；always = 当所有人都装了；never = 一律当作没装
+  detect: auto             # auto = 事件 + API 判定；always = 当所有人都装了；never = 一律当作没装
 ```
 
 说明：
@@ -171,6 +172,8 @@ cd resourcepack
 .\build-pack.ps1     # 产物：dist\ChatPrefix-Rainbow-1.2.0.zip，同时打印 sha1
 ```
 
+资源包内容自 1.2.0 起没再改动，所以它停在 1.2.0；插件版本的推进与它无关。
+
 生效链路：
 
 1. 把 zip 下发给玩家（`server.properties` 的 `resource-pack=` + `resource-pack-sha1=`，
@@ -191,13 +194,34 @@ cd resourcepack
 * **尚未做真机验证**：着色器接口与原版 1.21.11 已逐项比对通过（见 CREDITS.md），
   但「玩家装上包后实际看到的画面」需要有人进服确认，离线测试覆盖不到这一步。
 
+### 装了包但彩虹没有变化？先跑 `/cp pack`
+
+判定链路上有两个容易踩的点：
+
+1. **服务端必须跑 1.2.1 或更高的插件**。1.2.0 也有这条分支，但 `auto` 判定只问 API，
+   不够可靠；1.2.1 起会同时记录客户端上报的资源包状态事件。如果 `plugins/ChatPrefix/config.yml`
+   里根本找不到 `pack:` 段，那就是在跑旧 jar。
+2. **客户端手动装包，服务端看不到**。把 zip 自己丢进 `resourcepacks` 文件夹时，服务器没有任何
+   途径知道，`auto` 必然判为「没装」。这种情形把 `pack.detect` 改成 `always`。
+
+`/cp pack` 会把每一步摊开：插件版本、三项 `pack.*` 配置、最近一次资源包状态事件、
+`hasResourcePack()`、`getResourcePackStatus()`、最终判定，以及你自己前缀的原文。
+
+看到的现象能直接区分问题：
+
+| 聊天里看到 | 说明 |
+| --- | --- |
+| 前缀是**纯色**黄绿（`#F8F85C`） | 魔法色生效了，但客户端没装成包 → 包没加载成功，或 `detect` 判错了 |
+| 前缀是**固定彩虹** | 魔法色没生效，插件走了逐消息相位那条路径 → 看 `/cp pack` 的最终判定 |
+| 前缀**在原地滚动** | 成功 |
+
 ## 从源码构建
 
 只需要 JDK，不需要 Maven/Gradle。
 
 ```powershell
 cd 1.21.11
-.\build.ps1          # 产物：dist\ChatPrefix-1.2.0-1.21.11.jar
+.\build.ps1          # 产物：dist\ChatPrefix-1.2.1-1.21.11.jar
 ```
 
 `build.ps1` 用 JDK 21 编译（`--release 21`），把 `build/classes` 与 `resources/*` 打进 jar。
