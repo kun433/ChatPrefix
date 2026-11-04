@@ -5,6 +5,9 @@
 // 插件把这个颜色用在「装了本资源包」的玩家所看到的前缀文字上，
 // 客户端就会把那段文字渲染成原地流动的彩虹（不再依赖每条消息推进相位）。
 //
+// 与上游的差异：上游用 TEXT_EFFECT（只匹配正文），本包改用 TEXT_EFFECT_WITH_SHADOW，
+// 让聊天行自带的阴影也走同一条彩虹路径，否则彩虹旁边会挂一圈暗黄的阴影。
+//
 // 文件位置是 Text Effects 官方留的扩展点：text_effects_utils.glsl 单点 import 它。
 // 除本文件列出的映射外，任何颜色都不会触发出特效。
 //
@@ -20,6 +23,9 @@
 
 // Rainbow (#F8F85C)
 // 触发色必须与 ChatPrefix 的 config.yml 里 pack.magic-color 保持一致
-TEXT_EFFECT(rgb(0xF8F85C)) {
+//
+// 用 WITH_SHADOW 而不是 TEXT_EFFECT：聊天行默认带阴影，阴影是主色 * 0.25 的单独一层。
+// 只匹配主色的话，彩虹文字旁边会留一圈暗黄的阴影。
+TEXT_EFFECT_WITH_SHADOW(rgb(0xF8F85C)) {
     apply_rainbow();
 }

@@ -18,8 +18,13 @@ import org.bukkit.configuration.file.YamlConfiguration;
  */
 public final class PrefixStore {
 
-    /** 一条前缀记录；name 只用于回显与查找，不参与匹配逻辑。 */
-    public record Entry(UUID uuid, String name, String prefix) {
+    /**
+     * 一条前缀记录；name 只用于回显与查找，不参与匹配逻辑。
+     *
+     * @param rainbow 彩虹开关（{@code /cp set ... --rainbow}）。true 时前缀按彩虹渲染，
+     *                原文里不需要写 {@code <rainbow>}；与原文里手写的标签是「或」的关系。
+     */
+    public record Entry(UUID uuid, String name, String prefix, boolean rainbow) {
     }
 
     private final File file;
@@ -53,7 +58,8 @@ public final class PrefixStore {
             if (uuid == null) {
                 continue;
             }
-            entries.put(uuid, new Entry(uuid, section.getString("name", key), prefix));
+            entries.put(uuid, new Entry(uuid, section.getString("name", key), prefix,
+                    section.getBoolean("rainbow", false)));
         }
     }
 
@@ -64,6 +70,10 @@ public final class PrefixStore {
             String path = "players." + entry.uuid();
             yaml.set(path + ".name", entry.name());
             yaml.set(path + ".prefix", entry.prefix());
+            // 关着就不写，老配置文件不会平白多出一行 false
+            if (entry.rainbow()) {
+                yaml.set(path + ".rainbow", true);
+            }
         }
         File parent = file.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
@@ -83,7 +93,11 @@ public final class PrefixStore {
     }
 
     public void set(UUID uuid, String name, String prefix) {
-        entries.put(uuid, new Entry(uuid, name, prefix));
+        set(uuid, name, prefix, false);
+    }
+
+    public void set(UUID uuid, String name, String prefix, boolean rainbow) {
+        entries.put(uuid, new Entry(uuid, name, prefix, rainbow));
     }
 
     /** 删除并返回被删掉的记录，没有则返回 null。 */

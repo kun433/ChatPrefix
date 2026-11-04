@@ -1,6 +1,10 @@
+#ifndef TEXT_EFFECTS_26_3_GRADIENT_GLSL
+#define TEXT_EFFECTS_26_3_GRADIENT_GLSL
+
 // 0=↑  1=↗  2=→  3=↘  4=↓  5=↙  6=←  7=↖
+// Author: nattapat2871 (https://nattapat2871.me)
 void processGradientEffect(inout vec4 vertex, vec3 startColor, vec3 endColor, float direction) {
-    float vid = mod(float(gl_VertexID), 4.0);
+    float vid = mod(float(gl_VertexIndex), 4.0);
     float x_t = (vid == 2.0 || vid == 3.0) ? 1.0 : 0.0;
     float y_t = (vid == 1.0 || vid == 2.0) ? 1.0 : 0.0;
 
@@ -17,7 +21,7 @@ void processGradientEffect(inout vec4 vertex, vec3 startColor, vec3 endColor, fl
 
     vec3 gradColor = mix(startColor, endColor, t);
     applyProjection(vertex);
-    vec4 texColor = texelFetch(Sampler2, UV2 / 16, 0);
+    vec4 texColor = get_lightmap_color();
     vertexColor = vec4(gradColor, 1.0) * texColor;
     finalize();
 }
@@ -40,7 +44,9 @@ void processDynamicGradientEffect(inout vec4 vertex, vec3 startColor, vec3 endCo
     float t = 1.0 - abs(fract(GameTime * speed + spatial * 0.01) * 2.0 - 1.0);
     vec3 gradColor = mix(startColor, endColor, t);
     applyProjection(vertex);
-    vec4 texColor = texelFetch(Sampler2, UV2 / 16, 0);
+    vec4 texColor = get_lightmap_color();
     vertexColor = vec4(gradColor, 1.0) * texColor;
     finalize();
 }
+
+#endif // TEXT_EFFECTS_26_3_GRADIENT_GLSL

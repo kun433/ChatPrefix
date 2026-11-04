@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_DEFAULTS_GLSL
+#define TEXT_EFFECTS_26_3_DEFAULTS_GLSL
+
 // ============================================================
 // TEXT EFFECTS - DEFAULT VALUES
 // ============================================================
@@ -115,3 +118,5 @@
 #define WATER_AMPLITUDE 1.0
 #define WATER_SPEED 1.0
 #define WATER_FREQUENCY 1.5
+
+#endif // TEXT_EFFECTS_26_3_DEFAULTS_GLSL

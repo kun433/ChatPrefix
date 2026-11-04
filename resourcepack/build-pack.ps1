@@ -1,4 +1,4 @@
-﻿# 打包 ChatPrefix 彩虹前缀资源包（裁剪自 TheSalt_ 的 Text Effects）
+﻿# 打包 ChatPrefix 彩虹前缀资源包（裁剪自 TheSalt_ 的 Text Effects，26.3 版）
 # 用法：在 PowerShell 中执行  .\build-pack.ps1
 # 产物：dist\ChatPrefix-Rainbow-<version>.zip
 #
@@ -8,7 +8,7 @@
 $ErrorActionPreference = "Continue"
 
 $base = Split-Path -Parent $MyInvocation.MyCommand.Path
-$version = "1.2.0"
+$version = "1.3.0"
 $stage = "$base\build\stage"
 $out = "$base\dist\ChatPrefix-Rainbow-$version.zip"
 
@@ -18,8 +18,8 @@ $required = @(
     "CREDITS.md",
     "LICENSE-Text_Effects.txt",
     "assets\minecraft\shaders\include\_config.glsl",
-    "assets\minecraft\shaders\core\rendertype_text.vsh",
-    "assets\minecraft\shaders\core\rendertype_text.fsh"
+    "assets\minecraft\shaders\core\text.vsh",
+    "assets\minecraft\shaders\core\text.fsh"
 )
 $missing = 0
 foreach ($item in $required) {
@@ -32,10 +32,24 @@ if ($missing -gt 0) {
     exit 1
 }
 
+Write-Host "== 检查没有残留 1.21.11 时代的核心着色器 =="
+$stale = @(Get-ChildItem -Path "$base\assets\minecraft\shaders\core" -Filter "rendertype_text*" -ErrorAction SilentlyContinue)
+if ($stale.Count -gt 0) {
+    Write-Host "  core 里还有 $($stale.Count) 个 rendertype_text* 文件，26.3 已改用 core/text.*，必须删掉" -ForegroundColor Red
+    exit 1
+}
+Write-Host "  干净"
+
 Write-Host "== 校验 pack.mcmeta 是合法 JSON =="
 try {
     $meta = Get-Content -LiteralPath "$base\pack.mcmeta" -Raw -Encoding UTF8 | ConvertFrom-Json
-    Write-Host "   min_format = $($meta.pack.min_format)，max_format = $($meta.pack.max_format)"
+    $min = $meta.pack.min_format -join "."
+    $max = $meta.pack.max_format -join "."
+    Write-Host "   min_format = $min，max_format = $max（26.3 = 97.1）"
+    if ($min -ne "97.1") {
+        Write-Host "  min_format 不是 97.1，资源包不会在 26.3 上被认作兼容" -ForegroundColor Red
+        exit 1
+    }
 } catch {
     Write-Host "pack.mcmeta 不是合法 JSON：$_" -ForegroundColor Red
     exit 1
@@ -72,12 +86,14 @@ try {
     $bad = @($names | Where-Object { $_ -like '*\*' })
     $coreCount = @($names | Where-Object { $_ -like "assets/minecraft/shaders/core/*" }).Count
     $includeCount = @($names | Where-Object { $_ -like "assets/minecraft/shaders/include/*" }).Count
+    $staleCount = @($names | Where-Object { $_ -like "*rendertype_text*" }).Count
     Write-Host "   pack.mcmeta 在根目录：$hasRootMeta"
     Write-Host "   条目总数：$($names.Count)"
-    Write-Host "   core 文件：$coreCount（应为 8）"
-    Write-Host "   include 文件：$includeCount（应为 30）"
+    Write-Host "   core 文件：$coreCount（应为 2：text.vsh + text.fsh）"
+    Write-Host "   include 文件：$includeCount（应为 31）"
+    Write-Host "   残留 rendertype_text：$staleCount（应为 0）"
     Write-Host "   含反斜杠的条目：$($bad.Count)（应为 0）"
-    if (-not $hasRootMeta -or $bad.Count -ne 0 -or $coreCount -ne 8) {
+    if (-not $hasRootMeta -or $bad.Count -ne 0 -or $coreCount -ne 2 -or $includeCount -ne 31 -or $staleCount -ne 0) {
         Write-Host "zip 结构不对，拒绝产出" -ForegroundColor Red
         exit 1
     }

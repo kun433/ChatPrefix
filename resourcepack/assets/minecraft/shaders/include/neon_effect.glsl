@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_NEON_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_NEON_EFFECT_GLSL
+
 // Neon effect: glowing glyph with a halo sampled from surrounding pixels.
 // Requires text_data.glsl to be imported before this file.
 // fshEffectParams.x = intensity (halo strength multiplier)
@@ -14,7 +17,7 @@ void applyNeonEffect(vec2 uv,
                      float gameTime,
                      sampler2D tex,
                      out vec4 result) {
-    float currentA = texture(tex, uv).a;
+    float currentA = textEffectsCoverage(tex, uv);
     float intensity    = effectParams.x;
     float flickerSpeed = effectParams.y;
 
@@ -41,7 +44,7 @@ void applyNeonEffect(vec2 uv,
                 sampleUV.y < uvMin.y || sampleUV.y > uvMax.y) {
                 continue;
             }
-            halo += texture(tex, sampleUV).a / r;
+            halo += textEffectsCoverage(tex, sampleUV) / r;
         }
     }
     halo /= float(SAMPLES) * 3.0;
@@ -66,3 +69,5 @@ void applyNeonEffect(vec2 uv,
         discard;
     }
 }
+
+#endif // TEXT_EFFECTS_26_3_NEON_EFFECT_GLSL

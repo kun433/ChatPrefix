@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_EXTRUDE_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_EXTRUDE_EFFECT_GLSL
+
 // 3D Extrude (Depth Shadow) effect: stacks multiple shadow copies in the down-right
 // direction to create a pressed/extruded 3D appearance.
 // Requires text_data.glsl to be imported before this file.
@@ -35,7 +38,7 @@ void applyExtrudeEffect(vec2 uv,
     // Main glyph: render at full base color
     bool insideBounds = (uv.x >= uvMin.x && uv.x <= uvMax.x &&
                          uv.y >= uvMin.y && uv.y <= uvMax.y);
-    float currentA = insideBounds ? texture(tex, uv).a : 0.0;
+    float currentA = insideBounds ? textEffectsCoverage(tex, uv) : 0.0;
     if (currentA > 0.1) {
         result = vec4(baseColor.rgb, currentA * baseColor.a);
         return;
@@ -47,7 +50,7 @@ void applyExtrudeEffect(vec2 uv,
         vec2 sampleUV = uv - layerStep * float(i);
         if (sampleUV.x < uvMin.x || sampleUV.x > uvMax.x ||
             sampleUV.y < uvMin.y || sampleUV.y > uvMax.y) continue;
-        float a = texture(tex, sampleUV).a;
+        float a = textEffectsCoverage(tex, sampleUV);
         if (a > 0.5) {
             vec3 layerColor;
             float layerAlpha;
@@ -91,3 +94,5 @@ void applyExtrudeEffect(vec2 uv,
     }
     discard;
 }
+
+#endif // TEXT_EFFECTS_26_3_EXTRUDE_EFFECT_GLSL

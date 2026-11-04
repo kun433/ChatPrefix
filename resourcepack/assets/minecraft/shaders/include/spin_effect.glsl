@@ -1,4 +1,7 @@
-#moj_import <minecraft:text_data.glsl>
+#ifndef TEXT_EFFECTS_26_3_SPIN_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_SPIN_EFFECT_GLSL
+
+#include <minecraft:text_data.glsl>
 
 void applySpinEffect(inout vec2 uv, vec3 t0, vec3 t1, vec3 t2, vec3 t3, float scale, float flip, vec2 originalUV, sampler2D texSampler) {
     if (scale >= 0.99 && flip <= 0.5) {
@@ -15,7 +18,7 @@ void applySpinEffect(inout vec2 uv, vec3 t0, vec3 t1, vec3 t2, vec3 t3, float sc
     // Full Area Scan: 20x20 grid (400 samples) to catch all edge details
     for (float x = 0.0; x <= 1.0; x += 0.05) {
         for (float y = 0.0; y <= 1.0; y += 0.05) {
-            if (texture(texSampler, uvMin + vec2(x, y) * uvSize).a > 0.1) {
+            if (textEffectsCoverage(texSampler, uvMin + vec2(x, y) * uvSize) > 0.1) {
                 if (x < minX) minX = x;
                 maxX = x;
                 hasInk = true;
@@ -45,3 +48,5 @@ void applySpinEffect(inout vec2 uv, vec3 t0, vec3 t1, vec3 t2, vec3 t3, float sc
 
     uv.x = uvMin.x + targetNormX * uvSize.x;
 }
+
+#endif // TEXT_EFFECTS_26_3_SPIN_EFFECT_GLSL

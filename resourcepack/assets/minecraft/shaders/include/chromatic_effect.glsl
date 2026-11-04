@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_CHROMATIC_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_CHROMATIC_EFFECT_GLSL
+
 // Chromatic Aberration effect: R channel offset left, B channel offset right,
 // composited additively (screen blend) for a color fringe look.
 // Requires text_data.glsl to be imported before this file.
@@ -30,9 +33,9 @@ void applyChromaticEffect(vec2 uv, vec4 baseColor, vec4 effectColor, vec4 effect
     vec2 sR = uv - offset;
     vec2 sG = uv;
     vec2 sB = uv + offset;
-    if (sR.x >= uvMin.x && sR.x <= uvMax.x && sR.y >= uvMin.y && sR.y <= uvMax.y) aR = texture(tex, sR).a;
-    if (sG.x >= uvMin.x && sG.x <= uvMax.x && sG.y >= uvMin.y && sG.y <= uvMax.y) aG = texture(tex, sG).a;
-    if (sB.x >= uvMin.x && sB.x <= uvMax.x && sB.y >= uvMin.y && sB.y <= uvMax.y) aB = texture(tex, sB).a;
+    if (sR.x >= uvMin.x && sR.x <= uvMax.x && sR.y >= uvMin.y && sR.y <= uvMax.y) aR = textEffectsCoverage(tex, sR);
+    if (sG.x >= uvMin.x && sG.x <= uvMax.x && sG.y >= uvMin.y && sG.y <= uvMax.y) aG = textEffectsCoverage(tex, sG);
+    if (sB.x >= uvMin.x && sB.x <= uvMax.x && sB.y >= uvMin.y && sB.y <= uvMax.y) aB = textEffectsCoverage(tex, sB);
 
     float maxA = max(max(aR, aG), aB);
     if (maxA < 0.1) discard;
@@ -46,3 +49,5 @@ void applyChromaticEffect(vec2 uv, vec4 baseColor, vec4 effectColor, vec4 effect
 
     result = vec4(color, maxA * baseColor.a);
 }
+
+#endif // TEXT_EFFECTS_26_3_CHROMATIC_EFFECT_GLSL

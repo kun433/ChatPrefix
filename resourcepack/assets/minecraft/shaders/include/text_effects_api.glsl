@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_TEXT_EFFECTS_API_GLSL
+#define TEXT_EFFECTS_26_3_TEXT_EFFECTS_API_GLSL
+
 // ============================================================
 // TEXT EFFECTS API
 // ============================================================
@@ -669,3 +672,5 @@ void apply_water(vec3 color, float level, float amplitude, float speed, float fr
 
 // NOTE: To apply effect to both text and shadow, use TEXT_EFFECT_WITH_SHADOW(rgb(R, G, B)) in _config.glsl
 // Shadow color is automatically calculated as RGB * 0.25
+
+#endif // TEXT_EFFECTS_26_3_TEXT_EFFECTS_API_GLSL

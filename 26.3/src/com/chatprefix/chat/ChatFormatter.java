@@ -68,8 +68,20 @@ public final class ChatFormatter {
      */
     public Component render(String prefixRaw, World.Environment environment, String worldName,
                             Component name, Component message, int rainbowPhase, boolean packViewer) {
+        return render(prefixRaw, environment, worldName, name, message, rainbowPhase, packViewer, false);
+    }
+
+    /**
+     * 渲染一整行聊天，并带上「这个前缀被 op 打开了彩虹开关」的信息。
+     *
+     * @param rainbow      前缀的彩虹开关（{@code /cp set ... --rainbow}）；true 时即使原文里没写
+     *                     {@code <rainbow>} 也按彩虹渲染
+     */
+    public Component render(String prefixRaw, World.Environment environment, String worldName,
+                            Component name, Component message, int rainbowPhase, boolean packViewer,
+                            boolean rainbow) {
         Map<String, Component> parts = new LinkedHashMap<>();
-        parts.put("prefix", prefix(prefixRaw, rainbowPhase, packViewer));
+        parts.put("prefix", prefix(prefixRaw, rainbowPhase, packViewer, rainbow));
         parts.put("dimension", dimension(environment, worldName));
         parts.put("name", name == null ? Component.empty() : name);
         parts.put("separator", separator());
@@ -96,14 +108,29 @@ public final class ChatFormatter {
      * {@code <rainbow:N>}，于是每条消息的彩虹起点不同，看起来像在流动。
      *
      * <p>{@code packViewer} 为 true 表示这个接收者装了资源包：此时若前缀本来就写了裸
-     * {@code <rainbow>}，整段（含方括号）会被刷成资源包约定的魔法色，交由 rendertype_text
+     * {@code <rainbow>}，整段（含方括号）会被刷成资源包约定的魔法色，交由 core/text
      * 着色器做**原地**流动；没装包的接收者仍走上面的逐消息相位彩虹。
      */
-    public Component prefix(String prefixRaw, int rainbowPhase, boolean packViewer) {
-        String raw = prefixRaw == null ? settings.prefixDefault() : prefixRaw;
-        if (raw == null || raw.isBlank()) {
+    public Component prefix(String raw, int rainbowPhase, boolean packViewer) {
+        return prefix(raw, rainbowPhase, packViewer, false);
+    }
+
+    /**
+     * 前缀段，带上「彩虹开关」。
+     *
+     * <p>{@code rainbow=true} 表示这个前缀被 op 用 {@code --rainbow} 打开了彩虹，原文本身不需要写
+     * {@code <rainbow>}；用 {@link Text#ensureRainbow} 补标签，因此「手写标签」与「开关」两条路径
+     * 后面的逻辑完全一致：资源包判定、相位流动、显式相位优先都照旧。
+     * 前缀原文已经写了 {@code <rainbow:2>} 时以原文为准（开关不覆盖用户的固定相位）。
+     */
+    public Component prefix(String prefixRaw, int rainbowPhase, boolean packViewer, boolean rainbow) {
+        String resolved = prefixRaw == null ? settings.prefixDefault() : prefixRaw;
+        if (resolved == null || resolved.isBlank()) {
             return Component.empty();
         }
+        String raw = rainbow
+                ? Text.ensureRainbow(resolved, settings.prefixAllowMiniMessage())
+                : resolved;
         Component body = Text.parse(raw, settings.prefixAllowMiniMessage(), rainbowPhase);
         String wrapper = settings.prefixWrapper();
         String configured = settings.prefixColor();

@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_TEXT_DATA_GLSL
+#define TEXT_EFFECTS_26_3_TEXT_DATA_GLSL
+
 struct TextData {
     vec2 uv;
     vec3 spinT0;
@@ -19,3 +22,5 @@ vec2 calculateUVBounds(vec3 t0, vec3 t1, vec3 t2, vec3 t3, out vec2 uvMin, out v
 
     return uvMax - uvMin;
 }
+
+#endif // TEXT_EFFECTS_26_3_TEXT_DATA_GLSL

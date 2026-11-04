@@ -1,3 +1,7 @@
+#ifndef TEXT_EFFECTS_26_3_COMMON_GLSL
+#define TEXT_EFFECTS_26_3_COMMON_GLSL
+
+// Author: nattapat2871 (https://nattapat2871.me)
 #define PI 3.14159265359
 #define TAU 6.28318530718
 
@@ -19,8 +23,17 @@ vec3 hue(float t) {
     return clamp(vec3(r, g, b), 0.0, 1.0);
 }
 
+vec4 get_lightmap_color() {
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+    return sample_lightmap(Sampler2, UV2);
+#else
+    return vec4(1.0);
+#endif
+}
+
 void finalize() {
-    vertexColor *= ColorModulator;
+    // ColorModulator is applied once, in the fragment shader.
+
 }
 
 void applyProjection(inout vec4 vertex) {
@@ -28,6 +41,7 @@ void applyProjection(inout vec4 vertex) {
 }
 
 void applyColorTexture() {
-    vec4 texColor = texelFetch(Sampler2, UV2 / 16, 0);
-    vertexColor = Color * texColor;
+    vertexColor = Color * get_lightmap_color();
 }
+
+#endif // TEXT_EFFECTS_26_3_COMMON_GLSL

@@ -1,27 +1,35 @@
-﻿# 编译 + 打包 ChatPrefix（Paper 1.21.11，Java 21 字节码）
+﻿# 编译 + 打包 ChatPrefix（Paper 26.3，Java 25 字节码）
 # 用法：在 PowerShell 中执行  .\build.ps1
-# 需要：JDK 21；依赖 jar 放在 lib/
+# 需要：JDK 25 或更高（26.3 的 paper-api 是 class 版本 69，javac 21 读不了）；依赖 jar 放在 lib/
 $ErrorActionPreference = "Continue"
 
 $base = Split-Path -Parent $MyInvocation.MyCommand.Path
-$jdk = "C:\Program Files\Java\jdk-21"
-$javac = "$jdk\bin\javac.exe"
-$jar = "$jdk\bin\jar.exe"
-if (-not (Test-Path $javac)) {
+# 26.3 起服务端要求 Java 25，--release 25 也需要 javac 25 以上
+$jdk = $null
+foreach ($candidate in @("C:\Program Files\Java\jdk-25", "C:\Program Files\Java\jdk-27.0.1.0.2", "C:\Program Files\Java\jdk-26.0.1")) {
+    if (Test-Path "$candidate\bin\javac.exe") {
+        $jdk = $candidate
+        break
+    }
+}
+if ($jdk) {
+    $javac = "$jdk\bin\javac.exe"
+    $jar = "$jdk\bin\jar.exe"
+    Write-Host "使用 JDK: $jdk"
+} else {
     $javac = "javac"
     $jar = "jar"
-    Write-Host "未找到 jdk-21，改用 PATH 里的 javac/jar" -ForegroundColor Yellow
+    Write-Host "未找到 JDK 25+，改用 PATH 里的 javac/jar（需要 25 以上）" -ForegroundColor Yellow
 }
 
 $libs = @(
-    "paper-api-1.21.11.jar",
-    "adventure-api-4.26.1.jar",
-    "adventure-key-4.26.1.jar",
-    "adventure-text-minimessage-4.26.1.jar",
-    "adventure-text-serializer-plain-4.26.1.jar",
-    "examination-api-1.3.0.jar",
+    "paper-api-26.3.build.241-stable.jar",
+    "adventure-api-5.2.0.jar",
+    "adventure-key-5.2.0.jar",
+    "adventure-text-minimessage-5.2.0.jar",
+    "adventure-text-serializer-plain-5.2.0.jar",
     "bungeecord-chat-1.21.jar",
-    "guava-33.3.1-jre.jar",
+    "guava-33.6.0-jre.jar",
     "failureaccess-1.0.2.jar"
 )
 foreach ($lib in $libs) {
@@ -41,7 +49,7 @@ New-Item -ItemType Directory -Force -Path $classes, $stage | Out-Null
 
 Write-Host "== 编译 =="
 $src = Get-ChildItem -Recurse "$base\src" -Filter *.java | ForEach-Object { $_.FullName }
-$javacOut = & $javac --release 21 -encoding UTF-8 -Xlint:-options -classpath $classpath -d $classes $src 2>&1 | Out-String
+$javacOut = & $javac --release 25 -encoding UTF-8 -Xlint:-options -classpath $classpath -d $classes $src 2>&1 | Out-String
 if ($LASTEXITCODE -ne 0) {
     Write-Host $javacOut
     Write-Host "编译失败（exit=$LASTEXITCODE）" -ForegroundColor Red
@@ -53,7 +61,7 @@ Copy-Item -Recurse "$classes\*" $stage -Force
 Copy-Item "$base\resources\plugin.yml" $stage -Force
 Copy-Item "$base\resources\config.yml" $stage -Force
 New-Item -ItemType Directory -Force -Path "$base\dist" | Out-Null
-$outJar = "$base\dist\ChatPrefix-1.2.1-1.21.11.jar"
+$outJar = "$base\dist\ChatPrefix-1.3.0-26.3.jar"
 Remove-Item -Force $outJar -ErrorAction SilentlyContinue
 & $jar cf $outJar -C $stage .
 if ($LASTEXITCODE -ne 0) {

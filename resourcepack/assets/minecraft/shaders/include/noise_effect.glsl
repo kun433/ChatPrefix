@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_NOISE_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_NOISE_EFFECT_GLSL
+
 // Noise / Static effect: randomly displaces UV coordinates per pixel,
 // with step-quantized time so the noise changes in discrete frames.
 // Requires text_data.glsl to be imported before this file.
@@ -34,10 +37,12 @@ void applyNoiseEffect(vec2 uv, vec4 baseColor, vec4 effectColor, vec4 effectPara
         sampleUV.y < uvMin.y || sampleUV.y > uvMax.y) {
         discard;
     }
-    float a = texture(tex, sampleUV).a;
+    float a = textEffectsCoverage(tex, sampleUV);
     if (a < 0.1) discard;
 
     // Subtle brightness flicker per frame
     float bright = 0.85 + 0.3 * noiseRandom(vec2(t, 0.5));
     result = vec4(baseColor.rgb * bright, a * baseColor.a);
 }
+
+#endif // TEXT_EFFECTS_26_3_NOISE_EFFECT_GLSL

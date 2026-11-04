@@ -1,12 +1,11 @@
-﻿# 真机冒烟测试：在隔离目录里启动真实 Paper 1.21.11，验证插件能加载、api-version 通过、
+﻿# 真机冒烟测试：在隔离目录里启动真实 Paper 26.3，验证插件能加载、api-version 通过、
 # 指令可用、prefixes.yml 往返读写正常。真实玩家聊天需要真人进服，见 README 的手工清单。
 #
 # 用法: .\smoke-test.ps1 [-ServerDir <目录>] [-JavaExe <java路径>]
-# 首次运行会下载 Paper 1.21.11 服务端 jar（约 52 MB）；若本机已有
-# PlayerInsight/.testserver/12111/cache/mojang_1.21.11.jar 会自动复用，避免走慢链路。
+# 首次运行会下载 Paper 26.3 服务端 jar（约 53 MB）。
 param(
     [string]$ServerDir = "",
-    [string]$JavaExe = "C:\Program Files\Java\jdk-21\bin\java.exe",
+    [string]$JavaExe = "C:\Program Files\Java\jdk-25\bin\java.exe",
     [int]$StartupWait = 70,
     [int]$CommandGap = 3,
     [int]$TimeoutSeconds = 300
@@ -17,14 +16,15 @@ try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 $tests = Split-Path -Parent $MyInvocation.MyCommand.Path
 $project = Split-Path -Parent $tests
-$base = Join-Path $project "1.21.11"
+$base = Join-Path $project "26.3"
 if ([string]::IsNullOrWhiteSpace($ServerDir)) {
-    $ServerDir = Join-Path $project ".testserver\12111"
+    $ServerDir = Join-Path $project ".testserver\263"
 }
 if (-not (Test-Path $JavaExe)) { $JavaExe = "java" }
 
-$paperUrl = "https://fill-data.papermc.io/v1/objects/5ffef465eeeb5f2a3c23a24419d97c51afd7dbb4923ff42df9a3f58bba1ccfba/paper-1.21.11-132.jar"
-$paperBuild = "paper-1.21.11-132"
+# Paper 26.3 build 241（与 26.3/lib 里的 paper-api 构建号一致）
+$paperUrl = "https://fill-data.papermc.io/v1/objects/ea1081663127a4256ca8ce500899a44b896c3a834a8bfac65d1e58ee1f1bee13/paper-26.3-241.jar"
+$paperBuild = "paper-26.3-241"
 
 Write-Host "== 准备测试服 $ServerDir =="
 New-Item -ItemType Directory -Force -Path $ServerDir, "$ServerDir\plugins", "$ServerDir\cache" | Out-Null
@@ -39,11 +39,11 @@ if (-not (Test-Path "$ServerDir\server.jar")) {
 }
 
 # 复用别处缓存好的原版 server.jar，省掉 paperclip 的慢速下载
-$cacheJar = "$ServerDir\cache\mojang_1.21.11.jar"
+$cacheJar = "$ServerDir\cache\mojang_26.3.jar"
 if (-not (Test-Path $cacheJar)) {
     $known = @(
-        (Join-Path $project "..\PlayerInsight\.testserver\12111\cache\mojang_1.21.11.jar"),
-        (Join-Path $env:USERPROFILE "Downloads\mojang_1.21.11.jar")
+        (Join-Path $project "..\PlayerInsight\.testserver\263\cache\mojang_26.3.jar"),
+        (Join-Path $env:USERPROFILE "Downloads\mojang_26.3.jar")
     )
     foreach ($candidate in $known) {
         if (Test-Path $candidate) {
@@ -69,8 +69,15 @@ $props = @(
 )
 Set-Content -Path "$ServerDir\server.properties" -Value $props -Encoding ASCII
 
-# 放插件
-Copy-Item "$base\dist\ChatPrefix-1.2.1-1.21.11.jar" "$ServerDir\plugins\" -Force
+# 放插件：取 dist 里最新的那个 jar，避免版本号写死后升版就找不到文件
+$pluginJar = Get-ChildItem "$base\dist\ChatPrefix-*.jar" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($null -eq $pluginJar) {
+    Write-Host "dist 里没有构建产物，先跑 26.3\build.ps1" -ForegroundColor Red
+    exit 1
+}
+Write-Host "== 使用插件 $($pluginJar.Name) =="
+Copy-Item $pluginJar.FullName "$ServerDir\plugins\" -Force
 New-Item -ItemType Directory -Force -Path "$ServerDir\plugins\ChatPrefix" | Out-Null
 # 预置两条记录：验证 prefixes.yml 的中文与颜色代码能读进来（玩家不在线也能被指令查到）
 $seed = @"
@@ -91,6 +98,7 @@ $commands = @(
     "cp",
     "cp list",
     "cp get TesterA",
+    "cp rainbow TesterA on",
     "cp remove TesterB",
     "cp list",
     "cp set NobodyX hi",
@@ -140,12 +148,14 @@ $text = $text -replace ([regex]::Escape($esc) + "\[[0-9;]*[A-Za-z]"), ""
 # 期望出现的片段（插件启动 + 指令回显）
 $expect = @(
     "Done (",
-    "已启用：前缀 2 条",
+    "：前缀 2 条",
     "共 2 条前缀",
     "TesterA 的前缀是",
+    "的前缀彩虹设为 开",
     "已删除 TesterB 的前缀",
     "共 1 条前缀",
     "找不到玩家 NobodyX",
+    "（彩虹）",
     "已重载 config.yml 与 prefixes.yml，当前 1 条前缀"
 )
 # 不该出现的片段（加载失败 / 运行时异常）
@@ -196,6 +206,12 @@ if ($config -and $config.Contains('format: "{prefix}{dimension}{name}{separator}
 $after = Get-Content -LiteralPath "$ServerDir\plugins\ChatPrefix\prefixes.yml" -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
 if ($after -and $after.Contains("TesterA") -and -not $after.Contains("TesterB")) {
     Write-Host "OK   prefixes.yml 已写回：TesterB 被删除、TesterA 保留"
+    if ($after.Contains("rainbow: true")) {
+        Write-Host "OK   prefixes.yml 保留了彩虹开关 rainbow: true"
+    } else {
+        Write-Host "FAIL prefixes.yml 没有写回 rainbow: true" -ForegroundColor Red
+        $failed++
+    }
 } else {
     Write-Host "FAIL prefixes.yml 写回结果不符" -ForegroundColor Red
     $failed++

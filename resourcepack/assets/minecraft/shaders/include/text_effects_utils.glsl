@@ -1,20 +1,23 @@
-#moj_import <minecraft:common.glsl>
-#moj_import <minecraft:offset.glsl>
-#moj_import <minecraft:defaults.glsl>
-#moj_import <minecraft:rainbow.glsl>
-#moj_import <minecraft:wavy.glsl>
-#moj_import <minecraft:bouncy.glsl>
-#moj_import <minecraft:blinking.glsl>
-#moj_import <minecraft:pulse.glsl>
-#moj_import <minecraft:spin.glsl>
-#moj_import <minecraft:shake.glsl>
-#moj_import <minecraft:fade.glsl>
-#moj_import <minecraft:iterating.glsl>
-#moj_import <minecraft:glitch.glsl>
-#moj_import <minecraft:gradient.glsl>
-#moj_import <minecraft:scale.glsl>
-#moj_import <minecraft:text_effects_api.glsl>
-#moj_import <minecraft:apply_effect.glsl>
+#ifndef TEXT_EFFECTS_26_3_TEXT_EFFECTS_UTILS_GLSL
+#define TEXT_EFFECTS_26_3_TEXT_EFFECTS_UTILS_GLSL
+
+#include <minecraft:common.glsl>
+#include <minecraft:offset.glsl>
+#include <minecraft:defaults.glsl>
+#include <minecraft:rainbow.glsl>
+#include <minecraft:wavy.glsl>
+#include <minecraft:bouncy.glsl>
+#include <minecraft:blinking.glsl>
+#include <minecraft:pulse.glsl>
+#include <minecraft:spin.glsl>
+#include <minecraft:shake.glsl>
+#include <minecraft:fade.glsl>
+#include <minecraft:iterating.glsl>
+#include <minecraft:glitch.glsl>
+#include <minecraft:gradient.glsl>
+#include <minecraft:scale.glsl>
+#include <minecraft:text_effects_api.glsl>
+#include <minecraft:apply_effect.glsl>
 
 // ============================================================
 // TEXT EFFECTS - Config-based System
@@ -68,7 +71,7 @@ void applyTextEffects() {
     // ============================================
     // Config-based color-effect mappings
     // ============================================
-    #moj_import <minecraft:_config.glsl>
+    #include <minecraft:_config.glsl>
 
     // If any effect was applied, execute it
     if (hasAnyEffect()) {
@@ -83,8 +86,10 @@ void applyTextEffects() {
     // 1.21.6+ uses tight z-steps for UI layering — a 0.001 nudge there flips
     // tooltip/autocomplete ordering relative to chat.
     if (ProjMat[3][3] == 0.0) {
-        gl_Position.z -= gl_Position.w * 0.001;
+        // Preserve vanilla depth for all text paths.
     }
     applyColorTexture();
     finalize();
 }
+
+#endif // TEXT_EFFECTS_26_3_TEXT_EFFECTS_UTILS_GLSL

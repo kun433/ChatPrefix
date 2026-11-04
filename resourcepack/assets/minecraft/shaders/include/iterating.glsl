@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_ITERATING_GLSL
+#define TEXT_EFFECTS_26_3_ITERATING_GLSL
+
 void processIteratingEffect(inout vec4 vertex, float speed, float space) {
     if (speed <= 0.0) speed = 1.0;
     if (space <= 0.0) space = 1.0;
@@ -13,3 +16,5 @@ void processIteratingEffect(inout vec4 vertex, float speed, float space) {
     applyProjection(vertex);
     finalize();
 }
+
+#endif // TEXT_EFFECTS_26_3_ITERATING_GLSL

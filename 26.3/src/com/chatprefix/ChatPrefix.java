@@ -60,7 +60,8 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
             command.setTabCompleter(executor);
         }
 
-        getLogger().info("已启用 ChatPrefix " + getDescription().getVersion()
+        // 26.3 起 getDescription() 被标为过时，Paper 的替代是 getPluginMeta()
+        getLogger().info("已启用 ChatPrefix " + getPluginMeta().getVersion()
                 + "：前缀 " + store.size() + " 条，模板 " + settings.format()
                 + "；资源包分支 " + (settings.packEnabled()
                         ? "开（检测 " + settings.packDetect() + "，魔法色 " + settings.packMagicColor() + "）"
@@ -112,7 +113,10 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
         // 在消息发出的这一刻定型：之后玩家传送、前缀被改，都不会影响已经发出的这条消息
         final World.Environment environment = world.getEnvironment();
         final String worldName = world.getName();
-        final String prefixRaw = store.prefixOf(player.getUniqueId());
+        final PrefixStore.Entry entry = store.get(player.getUniqueId());
+        final String prefixRaw = entry == null ? null : entry.prefix();
+        // 彩虹开关随前缀存在 prefixes.yml 里，聊天时按记录当场定型
+        final boolean prefixRainbow = entry != null && entry.rainbow();
         final ChatFormatter current = formatter;
         final boolean useDisplayName = settings.nameUseDisplayName();
         // 相位在消息发出的这一刻定型，同一条消息对所有接收者一致
@@ -124,7 +128,7 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
                     : current.name(source.getName());
             // 装没装资源包是按接收者算的：装了的人看到着色器做的原地彩虹，没装的回落逐消息相位彩虹
             return current.render(prefixRaw, environment, worldName, name, message,
-                    rainbowPhase, packViewer(viewer));
+                    rainbowPhase, packViewer(viewer), prefixRainbow);
         });
     }
 
@@ -191,8 +195,12 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
     }
 
     /**
-     * 当前时间对应的彩虹相位（0-9）。关掉动画时恒为 0；
+     * 当前时间对应的彩虹相位（1-10）。关掉动画时恒为 0（= 不替换裸标签，保持静态彩虹）；
      * 10 格为一整圈，所以每过 10/speed 秒循环一次。
+     *
+     * <p>返回 1-10 而不是 0-9：{@link Text#parse} 把 0 当作「调用方不想动动画」的哨兵值，
+     * 如果直接用 0-9，每转一圈就会有一帧漏掉相位替换，那一条消息的彩虹会猛地跳回静态相位。
+     * 10 与 0 在 MiniMessage 里视觉等价（都是一整圈），所以循环依旧连续。
      */
     private int rainbowPhase() {
         ChatSettings current = settings;
@@ -200,6 +208,6 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
             return 0;
         }
         double steps = System.currentTimeMillis() / 1000.0 * current.prefixRainbowSpeed();
-        return (int) Math.floorMod((long) Math.floor(steps), 10L);
+        return (int) Math.floorMod((long) Math.floor(steps), 10L) + 1;
     }
 }

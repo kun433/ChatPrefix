@@ -164,6 +164,36 @@ public final class FormatTest {
                 Text.forceColor(Text.parse("<green>管理员", true), Text.color("#F8F85C")));
 
         System.out.println();
+        System.out.println("== 彩虹开关（/cp set ... --rainbow）==");
+        Component flagOn = formatter.prefix("abcd", 0, false, true);
+        eq("开关打开：纯文本不带标签", "[abcd]", plain(flagOn));
+        eqChar("开关打开：第 1 个字吃到彩虹", "a", TextColor.color(0xFF0000), 1, flagOn);
+        eqChar("开关打开：方括号跟着彩虹", "[", TextColor.color(0xFF0000), 0, flagOn);
+        eqChar("开关打开 + 相位 2：同一个字换色", "a", TextColor.color(0xCBFF00), 1,
+                formatter.prefix("abcd", 2, false, true));
+        eqChar("开关关闭：文字保持原样", "a", null, 1,
+                formatter.prefix("abcd", 0, false, false));
+        eqChar("开关打开时 & 颜色代码与彩虹不冲突（首个字仍是红）", "a", NamedTextColor.RED, 1,
+                formatter.prefix("&cabcd", 0, false, true));
+        eq("开关打开不吞掉 & 颜色代码（纯文本）", "[abcd]",
+                plain(formatter.prefix("&cabcd", 0, false, true)));
+        eqChar("开关打开时手写 <rainbow:2> 仍然优先（固定相位）", "a", TextColor.color(0xCBFF00), 1,
+                formatter.prefix("<rainbow:2>abcd", 7, false, true));
+        eqChar("开关打开 + 装了包：整段刷成魔法色", "a", MAGIC, 1,
+                formatter.prefix("abcd", 0, true, true));
+        eqChar("开关打开 + 没装包：仍是相位彩虹", "a", TextColor.color(0xFF0000), 1,
+                formatter.prefix("abcd", 0, false, true));
+        eq("allow-minimessage=false 时开关不注入标签", "[abcd]",
+                plain(new ChatFormatter(settings("prefix.allow-minimessage", false))
+                        .prefix("abcd", 0, false, true)));
+        eq("ensureRainbow 不重复补标签", "<rainbow>abcd",
+                Text.ensureRainbow("<rainbow>abcd", true));
+        eq("ensureRainbow 对 <rainbow:2> 不插手", "<rainbow:2>abcd",
+                Text.ensureRainbow("<rainbow:2>abcd", true));
+        eq("hasRainbowTag(<rainbow:2>x)", "true", String.valueOf(Text.hasRainbowTag("<rainbow:2>x")));
+        eq("hasRainbowTag(&cx)", "false", String.valueOf(Text.hasRainbowTag("&cx")));
+
+        System.out.println();
         System.out.println("== 模板与配置项 ==");
         ChatFormatter custom = new ChatFormatter(settings(
                 "format", "{dimension}{name}: {message}",

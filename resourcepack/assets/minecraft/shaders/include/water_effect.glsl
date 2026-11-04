@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_WATER_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_WATER_EFFECT_GLSL
+
 // Water effect: fills the glyph interior with rising water up to a configurable
 // level, with a wavy animated surface and a light-to-dark depth gradient below.
 // Above the water line the fragment uses the base color (set with apply_color).
@@ -15,7 +18,7 @@ void applyWaterEffect(vec2 uv,
                       float gameTime,
                       sampler2D tex,
                       out vec4 result) {
-    float currentA = texture(tex, uv).a;
+    float currentA = textEffectsCoverage(tex, uv);
     if (currentA < 0.1) {
         discard;
     }
@@ -71,3 +74,5 @@ void applyWaterEffect(vec2 uv,
 
     result = vec4(waterCol, currentA * effectColor.a);
 }
+
+#endif // TEXT_EFFECTS_26_3_WATER_EFFECT_GLSL

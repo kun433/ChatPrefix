@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_OFFSET_GLSL
+#define TEXT_EFFECTS_26_3_OFFSET_GLSL
+
 vec2 currentOffset = vec2(0.0);
 
 void setOffset(float x, float y) {
@@ -20,3 +23,4 @@ void applyOffset(inout vec4 vertex) {
         vertex.xyz -= cameraUp * (currentOffset.y * worldScale);
     }
 }
+#endif // TEXT_EFFECTS_26_3_OFFSET_GLSL

@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_LIQUID_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_LIQUID_EFFECT_GLSL
+
 // Liquid Morph effect: smooth sin-based turbulence that displaces UV coordinates,
 // producing a slow organic liquid-like warp animation.
 // Requires text_data.glsl to be imported before this file.
@@ -29,8 +32,10 @@ void applyLiquidEffect(vec2 uv, vec4 baseColor, vec4 effectColor, vec4 effectPar
         sampleUV.y < uvMin.y || sampleUV.y > uvMax.y) {
         discard;
     }
-    float a = texture(tex, sampleUV).a;
+    float a = textEffectsCoverage(tex, sampleUV);
     if (a < 0.1) discard;
 
     result = vec4(baseColor.rgb, a * baseColor.a);
 }
+
+#endif // TEXT_EFFECTS_26_3_LIQUID_EFFECT_GLSL

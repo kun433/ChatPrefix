@@ -26,6 +26,9 @@ public final class Text {
     /** 裸 &lt;rainbow&gt; 标签；带参数的 &lt;rainbow:2&gt; 不匹配，保持用户自己指定的静态相位。 */
     private static final Pattern BARE_RAINBOW = Pattern.compile("(?i)<rainbow\\s*>");
 
+    /** 任意彩虹标签，含 &lt;rainbow:2&gt; 这种带相位的写法；用于判断前缀是否已经自己指定了彩虹。 */
+    private static final Pattern ANY_RAINBOW = Pattern.compile("(?i)<rainbow(?::[^<>]*)?\\s*>");
+
     /** 传统颜色代码 → MiniMessage 标签。 */
     private static final Map<Character, String> LEGACY = new LinkedHashMap<>();
 
@@ -130,6 +133,29 @@ public final class Text {
     /** 文本里是否含裸 &lt;rainbow&gt; 标签：调用方用它判断「这个前缀想要彩虹」。 */
     public static boolean wantsRainbow(String raw) {
         return raw != null && BARE_RAINBOW.matcher(raw).find();
+    }
+
+    /** 文本里是否已经有彩虹标签（裸标签或带相位都算）。 */
+    public static boolean hasRainbowTag(String raw) {
+        return raw != null && ANY_RAINBOW.matcher(raw).find();
+    }
+
+    /**
+     * 把「开关式彩虹」补成真实的 MiniMessage 标签，供 {@code /cp set ... --rainbow} 使用。
+     *
+     * <p>规则：
+     * <ul>
+     *   <li>前缀里已经写了任何彩虹标签（{@code <rainbow>} 或 {@code <rainbow:2>}）→ 原样返回，
+     *       尊重用户自己指定的固定相位；</li>
+     *   <li>没写 → 在最前面补一个裸 {@code <rainbow>}，于是它能吃到逐消息相位与资源包两条动画路径；</li>
+     *   <li>{@code allowMiniMessage=false} 时尖括号只是普通字符，补了也只会显示成文字，因此原样返回。</li>
+     * </ul>
+     */
+    public static String ensureRainbow(String raw, boolean allowMiniMessage) {
+        if (raw == null || raw.isEmpty() || !allowMiniMessage || hasRainbowTag(raw)) {
+            return raw;
+        }
+        return "<rainbow>" + raw;
     }
 
     /**

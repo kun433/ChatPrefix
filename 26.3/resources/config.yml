@@ -57,7 +57,7 @@ separator:
   text: " » "
   color: "gray"
 
-# 资源包侧的真·原地彩虹。工作方式是：资源包用 rendertype_text 核心着色器把某个「魔法色」
+# 资源包侧的真·原地彩虹。工作方式是：资源包用 core/text 核心着色器把某个「魔法色」
 # 渲成持续滚动的彩虹（见 resourcepack/），插件把装了包的玩家看到的前缀刷成那个颜色。
 # 没装包的玩家不受影响，继续用 prefix.rainbow 的逐消息相位彩虹。
 pack:

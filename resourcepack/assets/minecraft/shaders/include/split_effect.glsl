@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_SPLIT_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_SPLIT_EFFECT_GLSL
+
 // Split effect: cleanly cuts the glyph horizontally at vertical midpoint and
 // alternates the top half between the shifted-left position and the original
 // position over time.  Bottom half always renders at the original position.
@@ -51,10 +54,12 @@ void applySplitEffect(vec2 uv,
 
     vec2 sampleUV = vec2(uvMin.x + scaledU, uv.y);
 
-    float a = texture(tex, sampleUV).a;
+    float a = textEffectsCoverage(tex, sampleUV);
     if (a < 0.1) {
         discard;
     }
 
     result = vec4(baseColor.rgb, a * baseColor.a);
 }
+
+#endif // TEXT_EFFECTS_26_3_SPLIT_EFFECT_GLSL

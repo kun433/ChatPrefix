@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_OUTLINE_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_OUTLINE_EFFECT_GLSL
+
 // Outline effect: renders a colored border around glyph edges via 8-direction sampling.
 // Requires text_data.glsl to be imported before this file.
 // fshEffectParams.x = thickness (pixels, min 0.5)
@@ -30,7 +33,7 @@ void applyOutlineEffect(vec2 uv,
     // so the expanded quad doesn't pick up adjacent atlas cells.
     bool insideBounds = (uv.x >= uvMin.x && uv.x <= uvMax.x &&
                          uv.y >= uvMin.y && uv.y <= uvMax.y);
-    float currentA = insideBounds ? texture(tex, uv).a : 0.0;
+    float currentA = insideBounds ? textEffectsCoverage(tex, uv) : 0.0;
 
     float maxA = 0.0;
     for (int i = 0; i < 8; i++) {
@@ -42,7 +45,7 @@ void applyOutlineEffect(vec2 uv,
             sampleUV.y < uvMin.y || sampleUV.y > uvMax.y) {
             continue;
         }
-        float a = texture(tex, sampleUV).a;
+        float a = textEffectsCoverage(tex, sampleUV);
         if (a > maxA) maxA = a;
     }
 
@@ -56,3 +59,5 @@ void applyOutlineEffect(vec2 uv,
         discard;
     }
 }
+
+#endif // TEXT_EFFECTS_26_3_OUTLINE_EFFECT_GLSL

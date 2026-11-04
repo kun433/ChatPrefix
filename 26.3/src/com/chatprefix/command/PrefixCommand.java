@@ -34,7 +34,7 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
     private static final String PREFIX = "[聊天前缀] ";
     private static final int LIST_LIMIT = 100;
 
-    private static final List<String> SUBCOMMANDS = List.of("set", "remove", "get", "list", "pack", "reload", "help");
+    private static final List<String> SUBCOMMANDS = List.of("set", "rainbow", "remove", "get", "list", "pack", "reload", "help");
 
     private final ChatPrefix plugin;
 
@@ -55,6 +55,8 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "set":
                 return set(sender, label, args);
+            case "rainbow":
+                return rainbow(sender, label, args);
             case "remove":
             case "del":
             case "delete":
@@ -74,9 +76,15 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    /**
+     * /cp set &lt;玩家&gt; [--rainbow] &lt;文字&gt;
+     *
+     * <p>彩虹开关写在玩家名后面（也可以在末尾补一个），支持 {@code --rainbow} / {@code -r} /
+     * {@code rainbow} / {@code 彩虹} 四种写法。开关只影响「这个前缀按彩虹渲染」，不改动文字本身。
+     */
     private boolean set(CommandSender sender, String label, String[] args) {
         if (args.length < 3) {
-            reply(sender, Component.text("用法：/" + label + " set <玩家> <文字>", NamedTextColor.RED));
+            reply(sender, Component.text("用法：/" + label + " set <玩家> [--rainbow] <文字>", NamedTextColor.RED));
             return true;
         }
         Target target = resolve(args[1]);
@@ -85,7 +93,24 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
                     + "：他不在线，服务器也没有他的记录。让他先上线一次再设置。", NamedTextColor.RED));
             return true;
         }
-        String text = String.join(" ", Arrays.copyOfRange(args, 2, args.length)).trim();
+        List<String> tokens = new ArrayList<>(Arrays.asList(args).subList(2, args.length));
+        if (tokens.size() == 1 && isRainbowFlag(tokens.get(0))) {
+            reply(sender, Component.text("开关后面还需要前缀文字：/" + label + " set <玩家> --rainbow <文字>",
+                    NamedTextColor.RED));
+            return true;
+        }
+        boolean rainbow = false;
+        // 前置开关：/cp set Steve --rainbow 本服
+        while (tokens.size() > 1 && isRainbowFlag(tokens.get(0))) {
+            rainbow = true;
+            tokens.remove(0);
+        }
+        // 后置开关：/cp set Steve 本服 --rainbow（至少给文字留一个 token，避免把「彩虹」这种前缀吞掉）
+        while (tokens.size() > 1 && isRainbowFlag(tokens.get(tokens.size() - 1))) {
+            rainbow = true;
+            tokens.remove(tokens.size() - 1);
+        }
+        String text = String.join(" ", tokens).trim();
         int visible = Text.visibleLength(text);
         int max = plugin.settings().prefixMaxLength();
         if (visible == 0) {
@@ -97,15 +122,81 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
                     + "（可改 config.yml 的 prefix.max-length，填 0 表示不限制）。", NamedTextColor.RED));
             return true;
         }
-        plugin.store().set(target.uuid(), target.name(), text);
+        plugin.store().set(target.uuid(), target.name(), text, rainbow);
         if (!save(sender)) {
             return true;
         }
         reply(sender, Component.text("已把 ", NamedTextColor.GRAY)
                 .append(Component.text(target.name(), NamedTextColor.WHITE))
                 .append(Component.text(" 的前缀设为 ", NamedTextColor.GRAY))
-                .append(plugin.formatter().prefix(text))
-                .append(Component.text("（原文：" + text + "）", NamedTextColor.DARK_GRAY)));
+                // 回显走逐消息相位彩虹，让人直接看到「这就是彩虹」，而不是资源包的魔法色
+                .append(plugin.formatter().prefix(text, 1, false, rainbow))
+                .append(Component.text("（原文：" + text + "，彩虹：" + (rainbow ? "开" : "关") + "）",
+                        NamedTextColor.DARK_GRAY)));
+        if (rainbow && !plugin.settings().prefixAllowMiniMessage()) {
+            reply(sender, Component.text("注意：config.yml 的 prefix.allow-minimessage 是 false，"
+                    + "尖括号会被当作普通文字，彩虹开关不会生效。", NamedTextColor.YELLOW));
+        }
+        return true;
+    }
+
+    /** 彩虹开关的四种写法（不区分大小写）。 */
+    private static boolean isRainbowFlag(String token) {
+        if (token == null) {
+            return false;
+        }
+        switch (token.toLowerCase(Locale.ROOT)) {
+            case "--rainbow":
+            case "-r":
+            case "rainbow":
+            case "彩虹":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** /cp rainbow &lt;玩家&gt; on|off —— 不改文字，只反转彩虹开关。 */
+    private boolean rainbow(CommandSender sender, String label, String[] args) {
+        if (args.length < 3) {
+            reply(sender, Component.text("用法：/" + label + " rainbow <玩家> on|off", NamedTextColor.RED));
+            return true;
+        }
+        Target target = resolve(args[1]);
+        PrefixStore.Entry entry = target != null
+                ? plugin.store().get(target.uuid())
+                : plugin.store().findByName(args[1]);
+        if (entry == null) {
+            reply(sender, Component.text(args[1] + " 还没有设置前缀，先 /" + label + " set 再开彩虹。", NamedTextColor.YELLOW));
+            return true;
+        }
+        boolean on;
+        switch (args[2].toLowerCase(Locale.ROOT)) {
+            case "on":
+            case "true":
+            case "开":
+                on = true;
+                break;
+            case "off":
+            case "false":
+            case "关":
+                on = false;
+                break;
+            default:
+                reply(sender, Component.text("第二个参数只能是 on 或 off。", NamedTextColor.RED));
+                return true;
+        }
+        plugin.store().set(entry.uuid(), entry.name(), entry.prefix(), on);
+        if (!save(sender)) {
+            return true;
+        }
+        reply(sender, Component.text("已把 ", NamedTextColor.GRAY)
+                .append(Component.text(entry.name(), NamedTextColor.WHITE))
+                .append(Component.text(" 的前缀彩虹设为 " + (on ? "开" : "关") + "：", NamedTextColor.GRAY))
+                .append(plugin.formatter().prefix(entry.prefix(), 1, false, on)));
+        if (on && !plugin.settings().prefixAllowMiniMessage()) {
+            reply(sender, Component.text("注意：prefix.allow-minimessage 是 false，彩虹开关不会生效。", NamedTextColor.YELLOW));
+        }
         return true;
     }
 
@@ -153,8 +244,9 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         reply(sender, Component.text(entry.name() + " 的前缀是 ", NamedTextColor.GRAY)
-                .append(plugin.formatter().prefix(entry.prefix()))
-                .append(Component.text("（原文：" + entry.prefix() + "）", NamedTextColor.DARK_GRAY)));
+                .append(plugin.formatter().prefix(entry.prefix(), 1, false, entry.rainbow()))
+                .append(Component.text("（原文：" + entry.prefix() + "；彩虹：" + (entry.rainbow() ? "开" : "关") + "）",
+                        NamedTextColor.DARK_GRAY)));
         return true;
     }
 
@@ -174,8 +266,9 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text(" - ", NamedTextColor.DARK_GRAY)
                     .append(Component.text(entry.name(), NamedTextColor.WHITE))
                     .append(Component.space())
-                    .append(plugin.formatter().prefix(entry.prefix()))
-                    .append(Component.text("  原文：" + entry.prefix(), NamedTextColor.DARK_GRAY)));
+                    .append(plugin.formatter().prefix(entry.prefix(), 1, false, entry.rainbow()))
+                    .append(Component.text("  原文：" + entry.prefix() + (entry.rainbow() ? "（彩虹）" : ""),
+                            NamedTextColor.DARK_GRAY)));
         }
         return true;
     }
@@ -192,7 +285,8 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         ChatSettings current = plugin.settings();
         reply(sender, Component.text("资源包判定诊断：", NamedTextColor.GRAY));
 
-        line(sender, "插件版本", plugin.getDescription().getVersion());
+        // 26.3 起 getDescription() 被标为过时，Paper 的替代是 getPluginMeta()
+        line(sender, "插件版本", plugin.getPluginMeta().getVersion());
         line(sender, "pack.enabled", String.valueOf(current.packEnabled()));
         line(sender, "pack.detect", current.packDetect());
         line(sender, "pack.magic-color", current.packMagicColor());
@@ -209,8 +303,12 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
                 : "算作没装包 → 走逐消息相位彩虹（想强制走资源包就把 pack.detect 改成 always）");
 
         String prefix = plugin.store().prefixOf(player.getUniqueId());
+        PrefixStore.Entry own = plugin.store().get(player.getUniqueId());
         line(sender, "你当前的前缀原文", prefix == null ? "（没设置）" : prefix);
+        line(sender, "彩虹开关", own == null ? "（没设置前缀）" : (own.rainbow() ? "开" : "关"));
         line(sender, "该前缀是否写了裸 <rainbow>", String.valueOf(Text.wantsRainbow(prefix)));
+        line(sender, "该前缀会不会走魔法色", String.valueOf(viewer && own != null
+                && (own.rainbow() || Text.wantsRainbow(prefix))));
         return true;
     }
 
@@ -227,7 +325,8 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
 
     private void help(CommandSender sender, String label) {
         reply(sender, Component.text("用法（需要 op 权限）：", NamedTextColor.GRAY));
-        sender.sendMessage(usage(label + " set <玩家> <文字>", "设置前缀，外层方括号由插件自动加上（写 本服 即显示 [本服]）"));
+        sender.sendMessage(usage(label + " set <玩家> [--rainbow] <文字>", "设置前缀；加 --rainbow 前缀就是一直变色的彩虹"));
+        sender.sendMessage(usage(label + " rainbow <玩家> on|off", "不改文字，只开关某位玩家前缀的彩虹"));
         sender.sendMessage(usage(label + " remove <玩家>", "取消前缀，之后聊天里不显示前缀段"));
         sender.sendMessage(usage(label + " get <玩家>", "查看某位玩家当前的前缀"));
         sender.sendMessage(usage(label + " list", "列出所有已设置的前缀"));
@@ -295,6 +394,24 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
                 }
             }
             return filter(names, args[1]);
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("rainbow")) {
+            List<String> names = new ArrayList<>();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                names.add(player.getName());
+            }
+            for (PrefixStore.Entry entry : plugin.store().all()) {
+                if (entry.name() != null && !names.contains(entry.name())) {
+                    names.add(entry.name());
+                }
+            }
+            return filter(names, args[1]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("rainbow")) {
+            return filter(List.of("on", "off"), args[2]);
+        }
+        if (args.length >= 3 && args[0].equalsIgnoreCase("set")) {
+            return filter(List.of("--rainbow"), args[args.length - 1]);
         }
         return List.of();
     }

@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_GLITCH_GLSL
+#define TEXT_EFFECTS_26_3_GLITCH_GLSL
+
 void processGlitchEffect(inout vec4 vertex, float speed, float intensity) {
     if (speed <= 0.0) speed = 1.0;
     if (intensity <= 0.0) intensity = 2.0;
@@ -20,3 +23,5 @@ void processGlitchEffect(inout vec4 vertex, float speed, float intensity) {
     applyProjection(vertex);
     finalize();
 }
+
+#endif // TEXT_EFFECTS_26_3_GLITCH_GLSL

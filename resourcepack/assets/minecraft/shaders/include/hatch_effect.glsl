@@ -1,3 +1,6 @@
+#ifndef TEXT_EFFECTS_26_3_HATCH_EFFECT_GLSL
+#define TEXT_EFFECTS_26_3_HATCH_EFFECT_GLSL
+
 // Hatch effect: animated diagonal hatching pattern overlaid on the glyph.
 // Requires text_data.glsl to be imported before this file.
 // fshEffectParams.y = speed (sweep rate)
@@ -11,7 +14,7 @@ void applyHatchEffect(vec2 uv,
                       float gameTime,
                       sampler2D tex,
                       out vec4 result) {
-    float currentA = texture(tex, uv).a;
+    float currentA = textEffectsCoverage(tex, uv);
     if (currentA < 0.1) {
         discard;
     }
@@ -40,3 +43,5 @@ void applyHatchEffect(vec2 uv,
     float outAlpha = currentA * mix(baseColor.a, max(baseColor.a, effectColor.a), hatchMask);
     result = vec4(outColor, outAlpha);
 }
+
+#endif // TEXT_EFFECTS_26_3_HATCH_EFFECT_GLSL
