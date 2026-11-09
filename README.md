@@ -255,13 +255,24 @@ Notes:
 * `craftengine.mode: off` disables the whole integration; the tag handling then follows `missing` even
   if CE is installed.
 
-### Rainbow prefixes on a CE server
+### Rainbow prefixes on a CE server: let CE self-host the shader
 
 CE occupies the server's resource-pack slot, and ChatPrefix's rainbow shader is not part of it. With
-the integration active (mode `auto`/`on`) and `shader-merged: false`, the plugin therefore skips the
+the integration active (mode `auto`/`on`) and `shader-merged: false`, the plugin skips the
 magic-colour shader branch automatically: rainbow prefixes keep using the per-message phase drift,
-which needs no resource pack at all. If you merge `resourcepack/`'s `core/text.*` shaders into your
-CE pack, set `craftengine.shader-merged: true` to bring the in-place rainbow back.
+which needs no resource pack at all.
+
+To get the in-place rainbow on a CE server, hand the shaders to CE instead of shipping a separate zip:
+
+1. Copy the whole `resourcepack/dist/ce-resources/chatprefix-rainbow/` folder into the server's
+   `plugins/CraftEngine/resources/` directory (`artifacts/ce-resources/` holds the same folder, and
+   the release ships it as `ChatPrefix-Rainbow-1.3.0-CE.zip`; all three are identical);
+2. Run `/ce reload all` (or restart); CE merges the shaders into the pack it generates and pushes
+   automatically;
+3. Set `craftengine.shader-merged: true` to bring the magic-colour path back.
+
+No CE-side configuration is needed (`exclude-core-shaders` is false by default, so the shaders are
+kept), and players install nothing. Details are in the "Resource pack" section below.
 
 ## Resource pack: a genuinely animated rainbow (optional)
 
@@ -280,8 +291,29 @@ scrolling rainbow.
 
 ```powershell
 cd resourcepack
-.\build-pack.ps1     # -> dist\ChatPrefix-Rainbow-1.3.0.zip, and prints the sha1
+.\build-pack.ps1     # -> dist\ChatPrefix-Rainbow-1.3.0.zip, and prints the sha1;
+                     # also emits dist\ce-resources\chatprefix-rainbow\ (the CE self-hosted folder)
 ```
+
+### On a server with CraftEngine: let CE self-host it (recommended, no zip needed)
+
+CE merges everything under `resources/<pack>/resourcepack/` into the resource pack it generates and
+hosts itself — shaders included, verbatim (`exclude-core-shaders` is false by default). So:
+
+1. Copy the whole `resourcepack/dist/ce-resources/chatprefix-rainbow/` folder into the server's
+   `plugins/CraftEngine/resources/` directory.
+2. Run `/ce reload all` (or restart); CE rebuilds its resource pack and pushes it to players
+   automatically.
+3. Set `craftengine.shader-merged: true` in the plugin config so rainbow prefixes take the
+   magic-colour branch again.
+
+After that the `server.properties` pack URL and sha1 are no longer needed (CE takes over), and
+players don't install anything themselves. The folder is byte-identical to the zip shaders (same
+sources, same build script); it just drops `pack.mcmeta` (CE writes its own) and adds CE's
+`pack.yml`. Note: if you also run the full Text_Effects pack, both provide `include/_config.glsl`
+and will collide — keep one of them.
+
+### Without CE: the classic zip route
 
 The 1.3.0 pack is **no longer byte-identical** to 1.2.0, so upgraded servers must redistribute it
 (and update `resource-pack-sha1`):

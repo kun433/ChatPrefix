@@ -101,8 +101,60 @@ try {
     $zip.Dispose()
 }
 
+Write-Host "== 输出 CraftEngine 自托管版（resources/<包>/resourcepack/ 结构）=="
+# CraftEngine 会把 plugins/CraftEngine/resources/<包>/resourcepack/ 里的文件按相对路径原样
+# 合并进它生成并自动托管的资源包（exclude-core-shaders 默认 false，不会删着色器），
+# pack.mcmeta 由 CE 自己生成校验，所以这里刻意不放；pack.yml 照官方内置包的写法。
+$ceRoot = "$base\dist\ce-resources"
+$ceDir = "$ceRoot\chatprefix-rainbow"
+Remove-Item -Recurse -Force $ceRoot -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path "$ceDir\resourcepack" | Out-Null
+Copy-Item -Recurse "$base\assets" "$ceDir\resourcepack\assets" -Force
+Copy-Item "$base\LICENSE-Text_Effects.txt" $ceDir -Force
+Copy-Item "$base\CREDITS.md" $ceDir -Force   # CE 默认排除 md 扩展名，不会进包，仅随文件夹留说明
+@"
+author: ChatPrefix
+version: $version
+description: ChatPrefix rainbow text shader (trimmed Text_Effects for 26.3)
+namespace: minecraft
+enable: true
+"@ | Set-Content -LiteralPath "$ceDir\pack.yml" -Encoding Ascii
+
+# 与 zip 同样的结构断言（不含 pack.mcmeta，多一个 pack.yml + 两个说明文件）
+$ceAssets = Get-ChildItem -Recurse -File "$ceDir\resourcepack\assets"
+$ceCore = @($ceAssets | Where-Object { $_.FullName -like "*shaders\core\*" })
+$ceInclude = @($ceAssets | Where-Object { $_.FullName -like "*shaders\include\*" })
+$ceStale = @($ceAssets | Where-Object { $_.Name -like "rendertype_text*" })
+if ($ceCore.Count -ne 2 -or $ceInclude.Count -ne 31 -or $ceStale.Count -ne 0) {
+    Write-Host "CE resources 文件夹结构不对（core=$($ceCore.Count) include=$($ceInclude.Count) 残留=$($ceStale.Count)），拒绝产出" -ForegroundColor Red
+    exit 1
+}
+Write-Host "   -> $ceDir（core=2，include=31）"
+
+Write-Host "== 打包 CE 自托管版 zip（解压后得到 chatprefix-rainbow/ 文件夹）=="
+# GitHub Release 不能挂文件夹，所以额外打一个带顶层目录的 zip；内容与上面的文件夹逐字节一致。
+$ceZip = "$base\dist\ChatPrefix-Rainbow-$version-CE.zip"
+Remove-Item -Force $ceZip -ErrorAction SilentlyContinue
+$ceArchive = [System.IO.Compression.ZipFile]::Open($ceZip, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    foreach ($file in Get-ChildItem -Recurse -File -LiteralPath $ceDir) {
+        $relative = "chatprefix-rainbow/" + $file.FullName.Substring($ceDir.Length + 1).Replace('\', '/')
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($ceArchive, $file.FullName, $relative) | Out-Null
+    }
+} finally {
+    $ceArchive.Dispose()
+}
+$ceEntries = @(([System.IO.Compression.ZipFile]::OpenRead($ceZip)).Entries | ForEach-Object { $_.FullName })
+$ceBad = @($ceEntries | Where-Object { $_ -notlike "chatprefix-rainbow/*" -or $_ -like '*\*' })
+if ($ceBad.Count -ne 0 -or $ceEntries.Count -ne 36) {
+    Write-Host "CE zip 结构不对（条目 $($ceEntries.Count)，异常 $($ceBad.Count)），拒绝产出" -ForegroundColor Red
+    exit 1
+}
+Write-Host "   -> $ceZip（36 个条目，全部在 chatprefix-rainbow/ 下）"
+
 Write-Host "== 完成 =="
 Get-ChildItem "$base\dist" | Select-Object Name, Length
+Get-ChildItem -Recurse "$base\dist\ce-resources" -File | Select-Object FullName, Length | Format-Table -AutoSize | Out-String -Width 200
 Write-Host ""
 Write-Host "== SHA1（server.properties 的 resource-pack-sha1 / Paper 的 resource-pack 用这个）=="
 (Get-FileHash $out -Algorithm SHA1).Hash.ToLower()

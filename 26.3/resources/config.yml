@@ -60,6 +60,9 @@ separator:
 # 资源包侧的真·原地彩虹。工作方式是：资源包用 core/text 核心着色器把某个「魔法色」
 # 渲成持续滚动的彩虹（见 resourcepack/），插件把装了包的玩家看到的前缀刷成那个颜色。
 # 没装包的玩家不受影响，继续用 prefix.rainbow 的逐消息相位彩虹。
+# 服务器装了 CraftEngine 时，推荐把 resourcepack/dist/ce-resources/chatprefix-rainbow/
+# 整个文件夹复制到 plugins/CraftEngine/resources/ 下，由 CE 自托管并合并进它的资源包，
+# 然后把 craftengine.shader-merged 改成 true（见下方 craftengine 配置节的说明）。
 pack:
   # 关掉则一律走逐消息相位彩虹，不会向任何玩家输出魔法色
   enabled: true
@@ -90,4 +93,7 @@ craftengine:
   # 是否已把 ChatPrefix 的 core/text 彩虹着色器合并进了服务器的资源包（例如打进 CE 的资源包）。
   # false（默认）= 在 CE 服务器上自动跳过「魔法色着色器彩虹」分支，前缀彩虹继续用逐消息相位（无需资源包）；
   # true = 着色器确实在包里，恢复魔法色路径。
+  # 推荐做法：把 resourcepack/dist/ce-resources/chatprefix-rainbow/ 文件夹复制到服务器的
+  # plugins/CraftEngine/resources/ 下（CE 会把它合并进自托管的资源包并自动下发），
+  # 然后把这里改成 true，CE 服的玩家就能看到原地流动的彩虹前缀。
   shader-merged: false

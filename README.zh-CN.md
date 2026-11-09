@@ -227,12 +227,22 @@ CE 在线但图片 id 不存在、以及带格式参数的复杂标签（如 `<i
   包拦截决定，与本插件无关。
 * `craftengine.mode: off` 关闭整个集成；即使 CE 在线，标签也只按 `missing` 处理。
 
-### CE 服务器上的彩虹前缀
+### CE 服务器上的彩虹前缀：交给 CE 自托管
 
-CE 占用着服务器的资源包槽位，而 ChatPrefix 的彩虹着色器不在里面。集成生效时（mode 为 `auto`/`on`）
-且 `shader-merged: false`，插件会自动跳过魔法色着色器分支：彩虹前缀继续用逐消息相位流动，完全
-不需要资源包。如果你把 `resourcepack/` 里的 `core/text.*` 着色器合并进了自己的 CE 包，把
-`craftengine.shader-merged` 改成 `true` 即可恢复原地彩虹。
+CE 占用着服务器的资源包槽位，ChatPrefix 的彩虹着色器不在里面。集成生效时（mode 为 `auto`/`on`）
+且 `shader-merged: false`，插件会自动跳过魔法色着色器分支：彩虹前缀继续用逐消息相位流动，
+完全不需要资源包。
+
+想要 CE 服上也有**原地流动的彩虹**，把着色器交给 CE 自托管（不需要再单独发 zip）：
+
+1. 把 `resourcepack/dist/ce-resources/chatprefix-rainbow/` 整个文件夹复制到服务器的
+   `plugins/CraftEngine/resources/` 下（也可以直接从 `artifacts/ce-resources/` 拿，或下载 Release 里的
+   `ChatPrefix-Rainbow-1.3.0-CE.zip` 解压，三份内容相同）；
+2. 执行 `/ce reload all`（或重启服务器），CE 会把这些着色器合并进它生成并自动下发的资源包；
+3. 把 `craftengine.shader-merged` 改成 `true`，恢复魔法色路径。
+
+CE 侧不需要改任何配置（`exclude-core-shaders` 默认就是 false，不会删着色器），玩家也不用自己装包。
+细节见下文「资源包」一节。
 
 ## 资源包：真·原地彩虹（可选）
 
@@ -248,8 +258,26 @@ CE 占用着服务器的资源包槽位，而 ChatPrefix 的彩虹着色器不�
 
 ```powershell
 cd resourcepack
-.\build-pack.ps1     # 产物：dist\ChatPrefix-Rainbow-1.3.0.zip，同时打印 sha1
+.\build-pack.ps1     # 产物：dist\ChatPrefix-Rainbow-1.3.0.zip，同时打印 sha1；
+                     # 同时产出 dist\ce-resources\chatprefix-rainbow\（CE 自托管版文件夹）
 ```
+
+### 服务器装了 CraftEngine：交给 CE 自托管（推荐，不用 zip）
+
+CE 会把它 `resources/<包>/resourcepack/` 里的文件按原路径合并进自己生成并自动托管的资源包，
+连着色器也会原样带上（`exclude-core-shaders` 默认就是 false）。所以只要：
+
+1. 把 `resourcepack/dist/ce-resources/chatprefix-rainbow/` 整个文件夹复制到服务器的
+   `plugins/CraftEngine/resources/` 目录下；
+2. 执行 `/ce reload all`（或重启服务器），CE 重新生成资源包并自动下发给玩家；
+3. 把插件配置的 `craftengine.shader-merged` 改成 `true`，让彩虹前缀恢复走魔法色分支。
+
+之后不再需要 `server.properties` 里的资源包地址和 sha1（CE 全权接管），玩家也不用自己装包。
+这个文件夹与 zip 内容完全一致（同一套着色器源，同一个构建脚本产出），只是去掉了 pack.mcmeta
+（由 CE 生成）并补了一个 CE 的 `pack.yml`。注意：如果你另外装了完整的 Text Effects 资源包，
+两边都有 `include/_config.glsl`，会撞文件，用其中一个就好。
+
+### 没装 CE：传统的 zip 方式
 
 1.3.0 的资源包与 1.2.0 **不再字节一致**，升过级的服要重新下发（`resource-pack-sha1` 也得换）：
 

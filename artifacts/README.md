@@ -7,8 +7,16 @@
 
 | 文件 | 用途 | 大小 | SHA1 |
 | --- | --- | --- | --- |
-| `ChatPrefix-1.4.0-26.3.jar` | 插件本体，放进服务器的 `plugins/` | 36294 B | `e5d7425b2cdaec7993241092a7d4515970c5b6e0` |
-| `ChatPrefix-Rainbow-1.3.0.zip` | 彩虹前缀资源包，发给玩家 | 36895 B | `d1037d36b3f5c197a47b4657ed52b80d365a25bf` |
+| `ChatPrefix-1.4.0-26.3.jar` | 插件本体，放进服务器的 `plugins/` | 36490 B | `e11d3869a73f563fe056f45cc71fd9c3b3af387e` |
+| `ce-resources/chatprefix-rainbow/` | 彩虹着色器的 **CraftEngine 自托管版**（整个文件夹复制到服务器的 `plugins/CraftEngine/resources/` 下） | 36 个文件 | 文件与下面两个 zip 内容一致 |
+| `ChatPrefix-Rainbow-1.3.0-CE.zip` | 上面那个文件夹的 zip 版（解压后得到 `chatprefix-rainbow/`，方便下载） | 39097 B | `ca80316b915790ac56620368ae93af0b004b6bb7` |
+| `ChatPrefix-Rainbow-1.3.0.zip` | 传统独立资源包（没装 CE 的服 / 想自己托管时用） | 36895 B | `d1037d36b3f5c197a47b4657ed52b80d365a25bf` |
+
+**装了 CraftEngine 的服务器用文件夹方式（推荐，不再需要单独发 zip）**：把
+`ce-resources/chatprefix-rainbow/` 整个文件夹复制到服务器的 `plugins/CraftEngine/resources/`
+下，执行 `/ce reload all`（或重启），CE 会把这些着色器合并进它生成并自动托管的资源包；
+然后把插件配置的 `craftengine.shader-merged` 改成 `true`，彩虹前缀就会走魔法色分支，
+玩家看到的就是原地流动的彩虹。CE 侧无需改任何配置（`exclude-core-shaders` 默认就是 false）。
 
 **这一版是 26.3 专用的。** 服务端要 Paper/Leaf 26.3 + Java 25；还在 1.21.11 上的服务器请用
 v1.2.1 的 jar 与 1.2.0 的包，两者不能混用（`api-version`、字节码版本、着色器文件名都变了）。
@@ -30,6 +38,9 @@ v1.2.1 的 jar 与 1.2.0 的包，两者不能混用（`api-version`、字节码
 首次启动会生成 `plugins/ChatPrefix/config.yml`。
 
 **资源包**（可选，用于「真正原地流动」的彩虹前缀）：
+
+装了 CraftEngine 的服务器优先用 `ce-resources/chatprefix-rainbow/` 文件夹（见上文），
+不需要下面的 server.properties 配置。没装 CE 时才需要单独下发包：
 
 ```properties
 # server.properties
@@ -66,7 +77,9 @@ cd ..\26.3
 .\build.ps1                 # -> dist\ChatPrefix-1.4.0-26.3.jar（需要 JDK 25+）
 
 cd ..\resourcepack
-.\build-pack.ps1            # -> dist\ChatPrefix-Rainbow-1.3.0.zip，并打印 sha1
+.\build-pack.ps1            # -> dist\ChatPrefix-Rainbow-1.3.0.zip（独立包）
+                            # -> dist\ce-resources\chatprefix-rainbow\（CE 自托管文件夹）
+                            # -> dist\ChatPrefix-Rainbow-1.3.0-CE.zip（上面文件夹的 zip）
 
 cd ..
 .\tests\run-tests.ps1       # 100 条离线断言

@@ -1,0 +1,5 @@
+author: ChatPrefix
+version: 1.3.0
+description: ChatPrefix rainbow text shader (trimmed Text_Effects for 26.3)
+namespace: minecraft
+enable: true
