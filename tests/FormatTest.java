@@ -1,8 +1,10 @@
 import java.util.ArrayList;
 import java.util.List;
 
+import com.chatprefix.ChatPrefix;
 import com.chatprefix.chat.ChatFormatter;
 import com.chatprefix.chat.ChatSettings;
+import com.chatprefix.craftengine.CraftEngineBridge;
 import com.chatprefix.util.Text;
 
 import net.kyori.adventure.text.Component;
@@ -262,6 +264,74 @@ public final class FormatTest {
         eqColor("Text.color(LIGHT_PURPLE 小写)", NamedTextColor.LIGHT_PURPLE, Text.color("light_purple"));
         eqColor("Text.color(#ff0000)", TextColor.color(0xff0000), Text.color("#ff0000"));
         eqColor("Text.color(乱写的返回 null)", null, Text.color("这不是颜色"));
+
+        System.out.println();
+        System.out.println("== CraftEngine 集成（本机无 CE，断言 fallback 行为）==");
+        eqInt("CE 图片标签按 1 个可见字符计长", 4, Text.visibleLength("<image:default:icons>&c管理员"));
+        // 27 字符的复杂标签不被简化替换，加上「管理员」3 个字 = 30
+        eqInt("复杂格式参数的图片标签按原文本计长", 30,
+                Text.visibleLength("<image:a:b:0:0:'<!shadow>'>&c管理员"));
+        eq("离线 + hide：标签被剔除，剩下文字",
+                "[管理员][末地]aaa_ovo » hi",
+                plain(new ChatFormatter(defaults, CraftEngineBridge.imageTagResolver(false, false))
+                        .render("<image:default:icons>&c管理员", World.Environment.THE_END, "world_the_end",
+                                formatter.name("aaa_ovo"), Component.text("hi"))));
+        eq("离线 + literal：标签保留原文本",
+                "[<image:default:icons>管理员][末地]aaa_ovo » hi",
+                plain(new ChatFormatter(defaults, CraftEngineBridge.imageTagResolver(false, true))
+                        .render("<image:default:icons>&c管理员", World.Environment.THE_END, "world_the_end",
+                                formatter.name("aaa_ovo"), Component.text("hi"))));
+        eq("复杂形式（带格式参数）离线时也按 missing 处理（hide）",
+                "[管理员][末地]aaa_ovo » hi",
+                plain(new ChatFormatter(defaults, CraftEngineBridge.imageTagResolver(false, false))
+                        .render("<image:default:icons:0:0:'<!shadow>'>&c管理员", World.Environment.THE_END, "world_the_end",
+                                formatter.name("aaa_ovo"), Component.text("hi"))));
+        eq("嵌套颜色标签里的 image 被剔除后文字相连、结构不破坏",
+                "[行政][末地]aaa_ovo » hi",
+                plain(new ChatFormatter(defaults, CraftEngineBridge.imageTagResolver(false, false))
+                        .render("<red>行<image:a:b>政", World.Environment.THE_END, "world_the_end",
+                                formatter.name("aaa_ovo"), Component.text("hi"))));
+        eqColor("image 标签两侧的文字仍吃到同一个 red 作用域", NamedTextColor.RED,
+                colorOf(new ChatFormatter(defaults, CraftEngineBridge.imageTagResolver(false, false))
+                        .prefix("<red>行<image:a:b>政"), "行政"));
+        eq("配置关闭 CE（resolver=null）时标签保留原文本（与旧版行为一致）",
+                "[<image:default:icons>管理员][末地]aaa_ovo » hi",
+                plain(new ChatFormatter(defaults)
+                        .render("<image:default:icons>&c管理员", World.Environment.THE_END, "world_the_end",
+                                formatter.name("aaa_ovo"), Component.text("hi"))));
+        eq("allow-minimessage=false 时 image 标签也被转义显示",
+                "[<image:default:icons>管理员][末地]aaa_ovo » hi",
+                plain(new ChatFormatter(settings("prefix.allow-minimessage", false),
+                        CraftEngineBridge.imageTagResolver(false, false))
+                        .render("<image:default:icons>管理员", World.Environment.THE_END, "world_the_end",
+                                formatter.name("aaa_ovo"), Component.text("hi"))));
+        eq("维度标签里也能用 image 标签",
+                "[主]aaa_ovo » hi",
+                plain(new ChatFormatter(settings("dimension.labels.OVERWORLD", "<image:default:icons>主"),
+                        CraftEngineBridge.imageTagResolver(false, false))
+                        .render(null, World.Environment.NORMAL, "world",
+                                formatter.name("aaa_ovo"), Component.text("hi"))));
+        eq("CraftEngineBridge.image 无 CE 时返回 null",
+                "null", String.valueOf(CraftEngineBridge.image("default:icons", 0, 0)));
+        eq("CE 在线但渲染失败同样按 fallback（literal 模式回显标签）",
+                "[<image:default:icons>管理员][末地]aaa_ovo » hi",
+                plain(new ChatFormatter(defaults, CraftEngineBridge.imageTagResolver(true, true))
+                        .render("<image:default:icons>&c管理员", World.Environment.THE_END, "world_the_end",
+                                formatter.name("aaa_ovo"), Component.text("hi"))));
+        eq("ChatSettings 默认 craftengine 配置：mode=auto / missing=hide / shader-merged=false",
+                "auto/hide/false",
+                defaults.ceMode() + "/" + defaults.ceMissing() + "/" + defaults.ceShaderMerged());
+        eq("ChatSettings 读取 craftengine 配置节",
+                "on/literal/true",
+                settings("craftengine.mode", "on", "craftengine.missing", "literal", "craftengine.shader-merged", true)
+                        .ceMode() + "/" + settings("craftengine.mode", "on", "craftengine.missing", "literal", "craftengine.shader-merged", true)
+                        .ceMissing() + "/" + settings("craftengine.mode", "on", "craftengine.missing", "literal", "craftengine.shader-merged", true)
+                        .ceShaderMerged());
+        eq("ceActive：off 恒为 false / on 恒为 true / auto 无 CE 时为 false",
+                "false/true/false",
+                ChatPrefix.ceActive(settings("craftengine.mode", "off"))
+                        + "/" + ChatPrefix.ceActive(settings("craftengine.mode", "on"))
+                        + "/" + ChatPrefix.ceActive(settings("craftengine.mode", "auto")));
 
         System.out.println();
         System.out.println("===== 结果：" + passed + " 通过 / " + failed + " 失败 =====");

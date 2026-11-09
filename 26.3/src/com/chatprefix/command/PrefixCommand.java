@@ -10,6 +10,7 @@ import java.util.UUID;
 import com.chatprefix.ChatPrefix;
 import com.chatprefix.chat.ChatSettings;
 import com.chatprefix.chat.PrefixStore;
+import com.chatprefix.craftengine.CraftEngineBridge;
 import com.chatprefix.util.Text;
 
 import net.kyori.adventure.text.Component;
@@ -34,7 +35,7 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
     private static final String PREFIX = "[聊天前缀] ";
     private static final int LIST_LIMIT = 100;
 
-    private static final List<String> SUBCOMMANDS = List.of("set", "rainbow", "remove", "get", "list", "pack", "reload", "help");
+    private static final List<String> SUBCOMMANDS = List.of("set", "rainbow", "remove", "get", "list", "pack", "ce", "reload", "help");
 
     private final ChatPrefix plugin;
 
@@ -67,6 +68,8 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
                 return list(sender);
             case "pack":
                 return packDiagnostics(sender);
+            case "ce":
+                return craftEngineStatus(sender);
             case "reload":
                 return reload(sender);
             case "help":
@@ -290,6 +293,10 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         line(sender, "pack.enabled", String.valueOf(current.packEnabled()));
         line(sender, "pack.detect", current.packDetect());
         line(sender, "pack.magic-color", current.packMagicColor());
+        if (ChatPrefix.ceActive(current)) {
+            line(sender, "CraftEngine 集成", "开启（shader-merged=" + current.ceShaderMerged()
+                    + (current.ceShaderMerged() ? "" : " → 跳过魔法色分支，用逐消息相位彩虹") + "）");
+        }
 
         PlayerResourcePackStatusEvent.Status tracked = plugin.trackedPackStatus(player.getUniqueId());
         line(sender, "最近一次状态事件", tracked == null ? "（从未上报，客户端手动装包时这是正常的）" : tracked.name());
@@ -323,6 +330,27 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    /**
+     * /cp ce —— 查看 CraftEngine 集成状态，排查「前缀里的图片图标没显示」。
+     */
+    private boolean craftEngineStatus(CommandSender sender) {
+        ChatSettings current = plugin.settings();
+        reply(sender, Component.text("CraftEngine 集成状态：", NamedTextColor.GRAY));
+        boolean present = CraftEngineBridge.pluginPresent();
+        line(sender, "CraftEngine 插件", present ? "已安装且在线" : "未安装或未启用");
+        line(sender, "craftengine.mode", current.ceMode());
+        line(sender, "集成生效", ChatPrefix.ceActive(current) ? "是 → <image:...> 标签会调用 CE API 渲染成图片字符" : "否 → 标签按 missing 配置处理");
+        line(sender, "craftengine.missing", current.ceMissing() + ("literal".equalsIgnoreCase(current.ceMissing())
+                ? "（渲染不了时保留原文本，CE 的网络层拦截或许还能替换）"
+                : "（渲染不了时剔除标签）"));
+        line(sender, "craftengine.shader-merged", String.valueOf(current.ceShaderMerged()));
+        line(sender, "反射通道", CraftEngineBridge.reflectionReady() ? "就绪" : (present ? "未就绪（CE 版本 API 有变化？）" : "未就绪（CE 未安装，正常）"));
+        sender.sendMessage(Component.text("  示例：", NamedTextColor.DARK_GRAY)
+                .append(Component.text("/cp set 玩家 <image:default:icons:0:0>&c管理员", NamedTextColor.WHITE))
+                .append(Component.text("  —— id 与 CE 图片配置的 命名空间:id:行:列 一致", NamedTextColor.GRAY)));
+        return true;
+    }
+
     private void help(CommandSender sender, String label) {
         reply(sender, Component.text("用法（需要 op 权限）：", NamedTextColor.GRAY));
         sender.sendMessage(usage(label + " set <玩家> [--rainbow] <文字>", "设置前缀；加 --rainbow 前缀就是一直变色的彩虹"));
@@ -331,6 +359,7 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(usage(label + " get <玩家>", "查看某位玩家当前的前缀"));
         sender.sendMessage(usage(label + " list", "列出所有已设置的前缀"));
         sender.sendMessage(usage(label + " pack", "看你自己的资源包判定细节（彩虹没生效时先跑这个）"));
+        sender.sendMessage(usage(label + " ce", "看 CraftEngine 集成状态（前缀里的图片图标没显示时跑这个）"));
         sender.sendMessage(usage(label + " reload", "重载 config.yml 与 prefixes.yml"));
     }
 

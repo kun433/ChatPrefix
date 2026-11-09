@@ -73,3 +73,21 @@ pack:
   #   never  = 一律当作没装
   # 不确定时进游戏执行 /cp pack，它会打印每一步的判定结果。
   detect: auto
+
+# CraftEngine（CE）集成：把 CE 里做好的自定义图片直接写进前缀/维度标签，聊天里渲染成彩色图标。
+# 语法与 CE 图片引用一致：<image:命名空间:id> / <image:命名空间:id:行> / <image:命名空间:id:行:列>
+# 前提：服务器装了 CraftEngine 插件，玩家装了 CE 自动下发的资源包。
+# 用法示例：/cp set Steve <image:default:icons:0:0>&c管理员
+#           /cp set Steve <image:default:crown>&6&l服主
+# 前缀、prefix.default、维度标签、分隔符、format 模板里的静态文字都能用。
+craftengine:
+  # auto = 检测到 CE 在线时自动启用集成；on = 强制启用；off = 关闭（标签按 missing 处理）
+  mode: auto
+  # 标签渲染不了时（CE 未装 / 图片 id 不存在）怎么处理：
+  #   hide    = 剔除标签，不会把 <image:...> 原文露出来（默认）
+  #   literal = 保留原文本 —— CE 在线时它的网络包拦截（system-chat，默认开）可能仍会替换它
+  missing: hide
+  # 是否已把 ChatPrefix 的 core/text 彩虹着色器合并进了服务器的资源包（例如打进 CE 的资源包）。
+  # false（默认）= 在 CE 服务器上自动跳过「魔法色着色器彩虹」分支，前缀彩虹继续用逐消息相位（无需资源包）；
+  # true = 着色器确实在包里，恢复魔法色路径。
+  shader-merged: false

@@ -31,6 +31,9 @@ public final class ChatSettings {
     private final boolean packEnabled;
     private final String packMagicColor;
     private final String packDetect;
+    private final String ceMode;
+    private final String ceMissing;
+    private final boolean ceShaderMerged;
 
     private ChatSettings(String format, String prefixDefault, String prefixWrapper, String prefixColor,
                          boolean prefixAllowMiniMessage, int prefixMaxLength, boolean prefixRainbowAnimate,
@@ -38,7 +41,8 @@ public final class ChatSettings {
                          String dimensionCustomLabel, Map<String, String> dimensionLabels,
                          Map<String, String> dimensionColors, boolean nameUseDisplayName, String nameColor,
                          String separatorText, String separatorColor, boolean packEnabled,
-                         String packMagicColor, String packDetect) {
+                         String packMagicColor, String packDetect,
+                         String ceMode, String ceMissing, boolean ceShaderMerged) {
         this.format = format;
         this.prefixDefault = prefixDefault;
         this.prefixWrapper = prefixWrapper;
@@ -58,6 +62,9 @@ public final class ChatSettings {
         this.packEnabled = packEnabled;
         this.packMagicColor = packMagicColor;
         this.packDetect = packDetect;
+        this.ceMode = ceMode;
+        this.ceMissing = ceMissing;
+        this.ceShaderMerged = ceShaderMerged;
     }
 
     /** 内置默认值，等价于 config.yml 全部缺项时的结果（用空 Configuration 走同一套读取逻辑）。 */
@@ -96,7 +103,10 @@ public final class ChatSettings {
                 cfg.getString("separator.color", "gray"),
                 cfg.getBoolean("pack.enabled", true),
                 cfg.getString("pack.magic-color", "#F8F85C"),
-                cfg.getString("pack.detect", "auto"));
+                cfg.getString("pack.detect", "auto"),
+                cfg.getString("craftengine.mode", "auto"),
+                cfg.getString("craftengine.missing", "hide"),
+                cfg.getBoolean("craftengine.shader-merged", false));
     }
 
     /** 整行模板，占位符：{prefix} {dimension} {name} {separator} {message}。 */
@@ -170,6 +180,21 @@ public final class ChatSettings {
     /** 判定玩家是否装了包：auto=用 API；always=当所有人都装了；never=一律当作没装。 */
     public String packDetect() {
         return packDetect;
+    }
+
+    /** CraftEngine 集成模式：auto=检测到 CE 在线时启用；on=强制启用；off=关闭。 */
+    public String ceMode() {
+        return ceMode;
+    }
+
+    /** &lt;image:...&gt; 渲染不了时的行为：hide=剔除标签；literal=保留原文本。 */
+    public String ceMissing() {
+        return ceMissing;
+    }
+
+    /** 用户是否已把 ChatPrefix 的彩虹着色器合并进服务器的资源包（如 CE 的资源包）。 */
+    public boolean ceShaderMerged() {
+        return ceShaderMerged;
     }
 
     /** 维度标签文案；主世界 / 下界 / 末地之外的维度用 custom-label 模板（{world} 为世界名）。 */

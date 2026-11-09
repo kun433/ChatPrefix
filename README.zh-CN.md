@@ -1,4 +1,4 @@
-# ChatPrefix v1.3.0 — Paper 26.3 聊天前缀与维度标签插件
+# ChatPrefix v1.4.0 — Paper 26.3 聊天前缀与维度标签插件
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -20,16 +20,17 @@
 | --- | --- |
 | 服务端 | Paper 26.3（Paper API；不是纯 Spigot/Bukkit）；Leaf 26.3 同样可用 |
 | Java | 25 或更高（26.3 起服务端最低 Java 25） |
-| 插件版本 | `1.3.0-26.3` |
+| 插件版本 | `1.4.0-26.3` |
 
 编译目标是 `paper-api-26.3`（构建号 241），用的是 `io.papermc.paper.event.player.AsyncChatEvent` 与 Adventure 5.2.0
-组件，不碰 NMS，因此在 Paper 26.x 的小版本更新里照常可用。刻意不依赖 PlaceholderAPI 或任何其他插件。
+组件，不碰 NMS，因此在 Paper 26.x 的小版本更新里照常可用。刻意不依赖 PlaceholderAPI；唯一的可选集成是
+CraftEngine（见下文），全程走反射、只在 `plugin.yml` 里登记 `softdepend` —— 没装 CE 的服务器行为与以前完全一致。
 
 > 这是给 26.3 的构建。还在 1.21.11 上的服务器请用 v1.2.1 的 jar，两者不能互换（`api-version` 与字节码版本都不同）。
 
 ## 安装
 
-1. 把 `ChatPrefix-1.3.0-26.3.jar` 放进服务端的 `plugins/` 目录。
+1. 把 `ChatPrefix-1.4.0-26.3.jar` 放进服务端的 `plugins/` 目录。
 2. 重启服务器（或 `/reload confirm`）。首次启动会生成 `plugins/ChatPrefix/config.yml` 与 `prefixes.yml`。
 3. 给某位玩家设置前缀：`/chatprefix set aaa_ovo 本服`。
 4. 想要“一直变色”的彩虹前缀：`/chatprefix set aaa_ovo 炒鸡大牛 --rainbow`。
@@ -49,6 +50,7 @@
 | `/cp get <玩家>` | 查看已存的前缀（含彩虹开关），并按聊天里的实际效果渲染出来。 |
 | `/cp list` | 列出所有已设置的前缀（最多 100 条），彩虹前缀带 `（彩虹）` 标记。 |
 | `/cp pack` | 打印你自己的资源包判定细节（刷新前缀的彩虹没生效时先跑这个）。 |
+| `/cp ce` | 打印 CraftEngine 集成状态（前缀里的 `<image:...>` 图片没显示时先跑这个）。 |
 | `/cp reload` | 重载 `config.yml` 与 `prefixes.yml`，不用重启服务器。 |
 | `/cp help` | 显示用法。 |
 
@@ -173,6 +175,12 @@ pack:
   enabled: true
   magic-color: "#F8F85C"   # 必须与资源包 _config.glsl 里 TEXT_EFFECT 的触发色一致
   detect: auto             # auto = 事件 + API 判定；always = 当所有人都装了；never = 一律当作没装
+
+# CraftEngine 集成：把 CE 里的自定义图片用作聊天图标；见「与 CraftEngine 集成」一节。
+craftengine:
+  mode: auto            # auto = 检测到 CE 在线时启用；on = 强制启用；off = 关闭
+  missing: hide         # hide = 剧除渲染不了的 <image:...> 标签；literal = 保留原文本
+  shader-merged: false  # 只有把 ChatPrefix 的彩虹着色器合并进服务器资源包后才改 true
 ```
 
 说明：
@@ -185,6 +193,46 @@ pack:
 * 玩家名与聊天内容从不做 MiniMessage 解析，玩家无法通过聊天注入格式或点击事件；
   只有配置文本和 op 输入的前缀会被解析。
 * 如果 `prefix.wrapper` 里漏写了 `{text}`，前缀文字会不加包裹直接显示，而不是被悄悄丢掉。
+
+## 与 CraftEngine 集成：图片前缀（可选）
+
+服务器同时装了 CraftEngine（CE）时，前缀可以直接用 CE 的自定义图片当彩色聊天图标。ChatPrefix
+通过反射调用 CE 的公开 API：没有编译期或硬性运行时依赖，没装 CE 的服务器行为与以前完全一致。
+
+在任何 ChatPrefix 会解析的文本里都能写图片引用 —— 前缀、`prefix.default`、维度标签、分隔符、
+以及 `format` 模板里的静态文字：
+
+| 你输入 | 聊天里显示 |
+| --- | --- |
+| `/cp set Steve <image:default:icons:0:0>&c管理员` | CE 图片 `default:icons` 的 (0, 0) 格 + 红色「管理员」 |
+| `/cp set Steve <image:default:crown>&6&l服主` | 单格图片 `default:crown` + 金色粗体「服主」 |
+| `/cp set Steve <image:default:icons>&c管理员` | 精灵图的第一格 + 红色「管理员」 |
+
+id 写法与 CE 自己的 `<image:...>` 标签一致（`命名空间:id[:行[:列]]`），所以在 CE 里已经定义好的图片
+可以直接拿过来用。渲染由 ChatPrefix 自己完成（调用 `CraftEngineImages.byId(...)`），玩家侧需要
+CE 的资源包 —— CE 会自动下发，所以在 CE 服务器上不需要任何额外配置。
+
+渲染不了的标签按 `craftengine.missing` 回退：
+
+* `hide`（默认）—— 剧除标签，不会把无法渲染的 `<image:...>` 原文露出来。
+* `literal` —— 保留原文本；CE 在线时它的网络包拦截（system-chat，默认开启）可能仍会在网络层替换掉。
+
+CE 在线但图片 id 不存在、以及带格式参数的复杂标签（如 `<image:default:icons:0:0:'<!shadow>'>`）
+同样走这套回退；前缀长度限制把可渲染的图片按 1 个可见字符计。
+
+说明：
+
+* `/cp ce` 打印集成状态：是否检测到 CE、`mode`、`missing`，反射通道是否就绪；前缀里的图片没显示时先跑它。
+* CE 的其它网络标签（`<shift:N>`、`<global:...>`、`<papi:...>`）只是原样透传；是否替换由 CE 的
+  包拦截决定，与本插件无关。
+* `craftengine.mode: off` 关闭整个集成；即使 CE 在线，标签也只按 `missing` 处理。
+
+### CE 服务器上的彩虹前缀
+
+CE 占用着服务器的资源包槽位，而 ChatPrefix 的彩虹着色器不在里面。集成生效时（mode 为 `auto`/`on`）
+且 `shader-merged: false`，插件会自动跳过魔法色着色器分支：彩虹前缀继续用逐消息相位流动，完全
+不需要资源包。如果你把 `resourcepack/` 里的 `core/text.*` 着色器合并进了自己的 CE 包，把
+`craftengine.shader-merged` 改成 `true` 即可恢复原地彩虹。
 
 ## 资源包：真·原地彩虹（可选）
 
@@ -258,7 +306,7 @@ cd resourcepack
 
 ```powershell
 cd 26.3
-.\build.ps1          # 产物：dist\ChatPrefix-1.3.0-26.3.jar
+.\build.ps1          # 产物：dist\ChatPrefix-1.4.0-26.3.jar
 ```
 
 `build.ps1` 用 JDK 25 编译（`--release 25`），把 `build/classes` 与 `resources/*` 打进 jar。
@@ -281,13 +329,14 @@ cd 26.3
 
 ```powershell
 cd tests
-.\run-tests.ps1      # 85 条离线断言，不需要服务器
+.\run-tests.ps1      # 100 条离线断言，不需要服务器
 .\smoke-test.ps1     # 在 .testserver\263 起真实 Paper 26.3，用控制台喂指令验证（默认不跑）
 ```
 
 `run-tests.ps1` 用 `ChatFormatter` 渲染聊天行，断言精确的纯文本与颜色，覆盖：有/无前缀、三种维度、
 自定义维度、`&` 与 MiniMessage 解析、彩虹开关（`--rainbow`）、方括号跟随文字颜色、彩虹相位流动、
-资源包魔法色分支、颜色优先级、自定义模板、长度计算，以及「玩家消息与玩家名不被解析」。
+资源包魔法色分支、颜色优先级、自定义模板、长度计算、CraftEngine 回退行为，以及「玩家消息与玩家名
+不被解析」。
 
 `smoke-test.ps1` 首次运行会下载 Paper 26.3 服务端 jar（若本机已有缓存的原版 jar 会自动复用），
 装上插件并启动服务器，再从控制台日志核对：插件是否启用、`/cp list|get|remove|set|reload` 是否符合预期、

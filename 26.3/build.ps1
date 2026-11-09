@@ -61,7 +61,7 @@ Copy-Item -Recurse "$classes\*" $stage -Force
 Copy-Item "$base\resources\plugin.yml" $stage -Force
 Copy-Item "$base\resources\config.yml" $stage -Force
 New-Item -ItemType Directory -Force -Path "$base\dist" | Out-Null
-$outJar = "$base\dist\ChatPrefix-1.3.0-26.3.jar"
+$outJar = "$base\dist\ChatPrefix-1.4.0-26.3.jar"
 Remove-Item -Force $outJar -ErrorAction SilentlyContinue
 & $jar cf $outJar -C $stage .
 if ($LASTEXITCODE -ne 0) {

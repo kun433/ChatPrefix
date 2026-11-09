@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 import com.chatprefix.util.Text;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.World;
 
 /**
@@ -23,8 +24,20 @@ public final class ChatFormatter {
 
     private final ChatSettings settings;
 
+    /**
+     * 额外的 MiniMessage 标签解析器，目前是 CraftEngine 的 &lt;image:...&gt;；
+     * null 表示不启用，行为与旧版完全一致。
+     */
+    private final TagResolver extraTags;
+
     public ChatFormatter(ChatSettings settings) {
+        this(settings, null);
+    }
+
+    /** 带额外标签解析器的构造；CE 集成时由主类传入 image 解析器。 */
+    public ChatFormatter(ChatSettings settings, TagResolver extraTags) {
         this.settings = settings;
+        this.extraTags = extraTags;
     }
 
     public ChatSettings settings() {
@@ -131,7 +144,7 @@ public final class ChatFormatter {
         String raw = rainbow
                 ? Text.ensureRainbow(resolved, settings.prefixAllowMiniMessage())
                 : resolved;
-        Component body = Text.parse(raw, settings.prefixAllowMiniMessage(), rainbowPhase);
+        Component body = Text.parse(raw, settings.prefixAllowMiniMessage(), rainbowPhase, extraTags);
         String wrapper = settings.prefixWrapper();
         String configured = settings.prefixColor();
         if (wrapper == null || !wrapper.contains("{text}")) {
@@ -150,9 +163,9 @@ public final class ChatFormatter {
         // 没配 prefix.color：方括号跟随相邻文字的颜色，文字本身没有颜色时保持不变
         int end = first + "{text}".length();
         Component segment = Component.empty()
-                .append(Text.tint(Text.parse(wrapper.substring(0, first), true), Text.firstColor(body)))
+                .append(Text.tint(Text.parse(wrapper.substring(0, first), true, 0, extraTags), Text.firstColor(body)))
                 .append(body)
-                .append(Text.tint(Text.parse(wrapper.substring(end), true), Text.lastColor(body)));
+                .append(Text.tint(Text.parse(wrapper.substring(end), true, 0, extraTags), Text.lastColor(body)));
         return magicColor(raw, packViewer, segment);
     }
 
@@ -174,14 +187,14 @@ public final class ChatFormatter {
         if (label == null || label.isBlank()) {
             return Component.empty();
         }
-        Component body = Text.parse(label, true);
+        Component body = Text.parse(label, true, 0, extraTags);
         return Text.tint(template(settings.dimensionWrapper(), Map.of("label", body)),
                 settings.dimensionColor(environment));
     }
 
     /** 名字与消息之间的分隔符。 */
     public Component separator() {
-        Component body = Text.parse(settings.separatorText(), true);
+        Component body = Text.parse(settings.separatorText(), true, 0, extraTags);
         return Text.tint(body, settings.separatorColor());
     }
 
@@ -198,14 +211,14 @@ public final class ChatFormatter {
         int last = 0;
         while (matcher.find()) {
             if (matcher.start() > last) {
-                result = result.append(Text.parse(pattern.substring(last, matcher.start()), true));
+                result = result.append(Text.parse(pattern.substring(last, matcher.start()), true, 0, extraTags));
             }
             Component replacement = parts.get(matcher.group(1));
             result = result.append(replacement == null ? Component.text(matcher.group()) : replacement);
             last = matcher.end();
         }
         if (last < pattern.length()) {
-            result = result.append(Text.parse(pattern.substring(last), true));
+            result = result.append(Text.parse(pattern.substring(last), true, 0, extraTags));
         }
         return result;
     }

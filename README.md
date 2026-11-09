@@ -1,4 +1,4 @@
-# ChatPrefix v1.3.0 — Chat Prefix and Dimension Tag for Paper 26.3
+# ChatPrefix v1.4.0 — Chat Prefix and Dimension Tag for Paper 26.3
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -21,19 +21,20 @@ player is in.
 | --- | --- |
 | Server | Paper 26.3 (Paper API, not Spigot/Bukkit-only); Leaf 26.3 works too |
 | Java | 25 or newer (26.3 servers require Java 25) |
-| Plugin version | `1.3.0-26.3` |
+| Plugin version | `1.4.0-26.3` |
 
 The plugin is built against `paper-api-26.3` (build 241) and uses
 `io.papermc.paper.event.player.AsyncChatEvent` plus Adventure 5.2.0 components. It does not use NMS,
 so it keeps working across Paper 26.x patch releases. There is deliberately no dependency on
-PlaceholderAPI or any other plugin.
+PlaceholderAPI. The only optional integration is CraftEngine (see [below](#craftengine-integration-image-prefixes-optional)),
+connected purely through reflection with a `softdepend` entry — on a server without CE nothing changes.
 
 > This is the 26.3 build. Servers still on 1.21.11 should keep the v1.2.1 jar; the two are not
 > interchangeable (`api-version` and the bytecode level both differ).
 
 ## Install
 
-1. Drop `ChatPrefix-1.3.0-26.3.jar` into the server's `plugins/` folder.
+1. Drop `ChatPrefix-1.4.0-26.3.jar` into the server's `plugins/` folder.
 2. Restart the server (or `/reload confirm`). `plugins/ChatPrefix/config.yml` and
    `prefixes.yml` are created on first start.
 3. Give an operator the prefix: `/chatprefix set aaa_ovo 本服`.
@@ -55,6 +56,7 @@ Everything is under one command, `chatprefix` (alias `cp`), and requires the
 | `/cp get <player>` | Shows the stored prefix (and its rainbow switch), rendered as it appears in chat. |
 | `/cp list` | Lists every stored prefix (up to 100 lines); rainbow entries are marked `（彩虹）`. |
 | `/cp pack` | Prints your own resource-pack detection details (run this first when the rainbow does nothing). |
+| `/cp ce` | Prints the CraftEngine integration status (run this when an `<image:...>` prefix shows nothing). |
 | `/cp reload` | Reloads `config.yml` and `prefixes.yml` without restarting the server. |
 | `/cp help` | Shows the usage summary. |
 
@@ -191,6 +193,12 @@ pack:
   enabled: true
   magic-color: "#F8F85C"   # must match the TEXT_EFFECT trigger colour in the pack's _config.glsl
   detect: auto             # auto = events + API; always = assume everyone has it; never = assume nobody
+
+# CraftEngine integration: use CE's custom images as chat icons. See the section below.
+craftengine:
+  mode: auto            # auto = enable when CE is detected; on = always; off = never
+  missing: hide         # hide = drop unrenderable <image:...> tags; literal = keep the raw text
+  shader-merged: false  # true only if you merged ChatPrefix's rainbow shader into the server's resource pack
 ```
 
 Notes:
@@ -207,6 +215,53 @@ Notes:
   formatting or click events through chat. Only config values and operator-typed prefixes are parsed.
 * If `prefix.wrapper` is missing its `{text}` placeholder, the prefix text is printed unwrapped
   instead of being silently dropped.
+
+## CraftEngine integration: image prefixes (optional)
+
+If the server also runs CraftEngine (CE), prefixes can use CE's custom images as colourful chat
+icons. ChatPrefix talks to CE's public API through reflection: there is no compile-time or hard
+runtime dependency, and on a server without CE everything behaves exactly as before.
+
+Write an image reference anywhere ChatPrefix parses text — the prefix, `prefix.default`, dimension
+labels, the separator, and literal text inside `format`:
+
+| You type | Chat shows |
+| --- | --- |
+| `/cp set Steve <image:default:icons:0:0>&c管理员` | the cell (0, 0) of CE's image `default:icons`, then a red 管理员 |
+| `/cp set Steve <image:default:crown>&6&l服主` | the single-cell image `default:crown`, then a bold gold 服主 |
+| `/cp set Steve <image:default:icons>&c管理员` | the first cell of the sprite, then a red 管理员 |
+
+The id syntax is the same as CE's own `<image:...>` tag (`namespace:id[:row[:column]]`), so whatever
+images you have already defined for CE can be reused directly. Rendering happens inside ChatPrefix
+itself (a call to `CraftEngineImages.byId(...)`), and each player needs CE's resource pack — which CE
+already sends automatically, so on a CE server this needs no extra setup.
+
+Tags ChatPrefix cannot render fall back per `craftengine.missing`:
+
+* `hide` (default) — the tag is removed, so an unreachable tag never appears as raw `<image:...>` text.
+* `literal` — the raw text stays; when CE is installed, its network-layer interception (system chat,
+  enabled by default) may still replace it there.
+
+`hide`/`literal` also apply when CE is installed but the image id does not exist, and to complex tags
+with a format parameter (e.g. `<image:default:icons:0:0:'<!shadow>'>`); the prefix length limit counts
+a renderable image as one visible character.
+
+Notes:
+
+* `/cp ce` prints the integration status: whether CE was detected, `mode`, `missing`, and whether the
+  reflection channel is up. Run it when an `<image:...>` prefix shows nothing.
+* Other CE network tags (`<shift:N>`, `<global:...>`, `<papi:...>`) are simply passed through as text;
+  whether CE replaces them is decided by CE's packet interception, not by this plugin.
+* `craftengine.mode: off` disables the whole integration; the tag handling then follows `missing` even
+  if CE is installed.
+
+### Rainbow prefixes on a CE server
+
+CE occupies the server's resource-pack slot, and ChatPrefix's rainbow shader is not part of it. With
+the integration active (mode `auto`/`on`) and `shader-merged: false`, the plugin therefore skips the
+magic-colour shader branch automatically: rainbow prefixes keep using the per-message phase drift,
+which needs no resource pack at all. If you merge `resourcepack/`'s `core/text.*` shaders into your
+CE pack, set `craftengine.shader-merged: true` to bring the in-place rainbow back.
 
 ## Resource pack: a genuinely animated rainbow (optional)
 
@@ -295,7 +350,7 @@ Only a JDK is needed — there is no Maven/Gradle build.
 
 ```powershell
 cd 26.3
-.\build.ps1          # -> dist\ChatPrefix-1.3.0-26.3.jar
+.\build.ps1          # -> dist\ChatPrefix-1.4.0-26.3.jar
 ```
 
 `build.ps1` compiles with JDK 25 (`--release 25`) and packs `build/classes` plus `resources/*`
@@ -319,15 +374,15 @@ build-numbered versions instead of `-R0.1-SNAPSHOT`, so the path is
 
 ```powershell
 cd tests
-.\run-tests.ps1      # 85 offline assertions, no server needed
+.\run-tests.ps1      # 100 offline assertions, no server needed
 .\smoke-test.ps1     # boots a real Paper 26.3 in .testserver\263 and drives it via console (opt-in)
 ```
 
 `run-tests.ps1` renders chat lines with `ChatFormatter` and asserts the exact plain text and colours
 for: prefix set/unset, all three dimensions, custom dimensions, `&`/MiniMessage parsing, the
 `--rainbow` switch, bracket colour following the text, the rainbow phase drift, the resource-pack
-magic-colour branch, colour precedence, custom templates, length accounting, and the guarantee that
-player messages and player names are not parsed.
+magic-colour branch, colour precedence, custom templates, length accounting, the CraftEngine
+fallback behaviour, and the guarantee that player messages and player names are not parsed.
 
 `smoke-test.ps1` downloads the Paper 26.3 server jar on first run (it reuses an already cached
 vanilla jar if one is present), installs the plugin, starts the server, and checks from the console

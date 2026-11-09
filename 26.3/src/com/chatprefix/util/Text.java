@@ -11,6 +11,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 /**
  * 文本解析工具：把「传统颜色代码（&amp;a / §a）」与「MiniMessage 标签（&lt;red&gt;）」统一成一个组件。
@@ -28,6 +29,12 @@ public final class Text {
 
     /** 任意彩虹标签，含 &lt;rainbow:2&gt; 这种带相位的写法；用于判断前缀是否已经自己指定了彩虹。 */
     private static final Pattern ANY_RAINBOW = Pattern.compile("(?i)<rainbow(?::[^<>]*)?\\s*>");
+
+    /**
+     * CE 图片标签（简单形式）：渲染成功时按 1 个可见字符计长。
+     * 排除引号/花括号，带格式参数的复杂形式按原文本计长。
+     */
+    private static final Pattern IMAGE_TAG_SIMPLE = Pattern.compile("(?i)<image:[^<>'\"{}]+>");
 
     /** 传统颜色代码 → MiniMessage 标签。 */
     private static final Map<Character, String> LEGACY = new LinkedHashMap<>();
@@ -108,6 +115,17 @@ public final class Text {
      *                     免得把用户自己指定的固定相位也改掉。
      */
     public static Component parse(String raw, boolean allowMiniMessage, int rainbowPhase) {
+        return parse(raw, allowMiniMessage, rainbowPhase, null);
+    }
+
+    /**
+     * 解析一段文本，同时挂上额外的标签解析器（目前用于 CraftEngine 的 &lt;image:...&gt;）。
+     *
+     * <p>extra 为 null 时行为与旧版完全一致；不为 null 时只有文本里真的出现对应标签
+     * 才会调用它，对普通文本零开销。allowMiniMessage=false 时不挂额外标签：
+     * &lt; &gt; 被转义成普通字符，与其它标签的处理规则保持一致。
+     */
+    public static Component parse(String raw, boolean allowMiniMessage, int rainbowPhase, TagResolver extra) {
         if (raw == null || raw.isEmpty()) {
             return Component.empty();
         }
@@ -120,7 +138,9 @@ public final class Text {
                     .replaceAll("<rainbow:" + Math.floorMod(rainbowPhase, 10) + ">");
         }
         try {
-            return MM.deserialize(converted);
+            return extra == null || !allowMiniMessage
+                    ? MM.deserialize(converted)
+                    : MM.deserialize(converted, extra);
         } catch (RuntimeException ex) {
             try {
                 return Component.text(MM.stripTags(converted));
@@ -179,15 +199,17 @@ public final class Text {
         return styled.children(children);
     }
 
-    /** 去掉颜色代码与标签后的可见长度，用于限制前缀长度。 */
+    /** 去掉颜色代码与标签后的可见长度，用于限制前缀长度；CE 图片标签按 1 个字符计。 */
     public static int visibleLength(String raw) {
         if (raw == null) {
             return 0;
         }
+        // 图片标签渲染出来是一个图标字符，不该按标签原文的 19 个字符去顶长度上限
+        String prepared = IMAGE_TAG_SIMPLE.matcher(raw).replaceAll("\uE000");
         try {
-            return MM.stripTags(legacyToTags(raw)).length();
+            return MM.stripTags(legacyToTags(prepared)).length();
         } catch (RuntimeException ex) {
-            return raw.length();
+            return prepared.length();
         }
     }
 

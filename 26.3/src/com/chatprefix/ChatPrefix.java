@@ -10,6 +10,7 @@ import com.chatprefix.chat.ChatFormatter;
 import com.chatprefix.chat.ChatSettings;
 import com.chatprefix.chat.PrefixStore;
 import com.chatprefix.command.PrefixCommand;
+import com.chatprefix.craftengine.CraftEngineBridge;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.audience.Audience;
@@ -61,11 +62,14 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
         }
 
         // 26.3 起 getDescription() 被标为过时，Paper 的替代是 getPluginMeta()
+        boolean ce = CraftEngineBridge.pluginPresent();
         getLogger().info("已启用 ChatPrefix " + getPluginMeta().getVersion()
                 + "：前缀 " + store.size() + " 条，模板 " + settings.format()
                 + "；资源包分支 " + (settings.packEnabled()
                         ? "开（检测 " + settings.packDetect() + "，魔法色 " + settings.packMagicColor() + "）"
-                        : "关"));
+                        : "关")
+                + "；CraftEngine " + (ce ? "已检测到" + (ceActive(settings) ? "（集成已启用）" : "（集成按配置关闭）")
+                        : "未安装"));
     }
 
     @Override
@@ -86,8 +90,30 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
         reloadConfig();
         ChatSettings loaded = ChatSettings.load(getConfig());
         this.settings = loaded;
-        this.formatter = new ChatFormatter(loaded);
+        // CE 集成随配置定型：mode/missing/shader-merged 改了之后 reload 即可生效
+        this.formatter = new ChatFormatter(loaded, CraftEngineBridge.imageTagResolver(
+                ceActive(loaded), "literal".equalsIgnoreCase(loaded.ceMissing())));
         this.store.load();
+    }
+
+    /**
+     * CraftEngine 集成当前是否生效。
+     *
+     * <p>{@code craftengine.mode}: on 恒为 true；off 恒为 false；auto 看插件在不在——
+     * plugin.yml 里已经 softdepend CraftEngine，走到这里 CE 要么先启动了，要么压根没装。
+     */
+    public static boolean ceActive(ChatSettings s) {
+        if (s == null) {
+            return false;
+        }
+        String mode = s.ceMode();
+        if ("on".equalsIgnoreCase(mode)) {
+            return true;
+        }
+        if ("off".equalsIgnoreCase(mode)) {
+            return false;
+        }
+        return CraftEngineBridge.pluginPresent();
     }
 
     public PrefixStore store() {
@@ -141,6 +167,12 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
     public boolean packViewer(Audience viewer) {
         ChatSettings current = settings;
         if (current == null || !current.packEnabled()) {
+            return false;
+        }
+        // CraftEngine 占着服务器的资源包（而 ChatPrefix 的彩虹着色器不在里面）时，
+        // 「装了包」不等于「有着色器」：此时跳过魔法色分支，继续用逐消息相位彩虹。
+        // 用户把着色器手动合并进 CE 的资源包后，把 craftengine.shader-merged 改成 true 即可恢复。
+        if (ceActive(current) && !current.ceShaderMerged()) {
             return false;
         }
         String policy = current.packDetect();

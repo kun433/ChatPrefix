@@ -7,19 +7,22 @@
 
 | 文件 | 用途 | 大小 | SHA1 |
 | --- | --- | --- | --- |
-| `ChatPrefix-1.3.0-26.3.jar` | 插件本体，放进服务器的 `plugins/` | 30233 B | `98a8e99ab66b47dac6faaaad1eebfb97a53f6d23` |
+| `ChatPrefix-1.4.0-26.3.jar` | 插件本体，放进服务器的 `plugins/` | 36294 B | `e5d7425b2cdaec7993241092a7d4515970c5b6e0` |
 | `ChatPrefix-Rainbow-1.3.0.zip` | 彩虹前缀资源包，发给玩家 | 36895 B | `d1037d36b3f5c197a47b4657ed52b80d365a25bf` |
 
 **这一版是 26.3 专用的。** 服务端要 Paper/Leaf 26.3 + Java 25；还在 1.21.11 上的服务器请用
 v1.2.1 的 jar 与 1.2.0 的包，两者不能混用（`api-version`、字节码版本、着色器文件名都变了）。
 
-* 插件：`api-version: '26.3'`、`version: 1.3.0-26.3`、Java 25 字节码；编译期已把
-  `getDescription()` 换成 26.3 的 `getPluginMeta()`。功能口径与 1.3.0 相同：
-  `/cp set` 的 `--rainbow` 开关、`/cp rainbow` 子命令、`/cp pack` 诊断。
-* 资源包：26.3 重写了文本渲染管道，旧版覆盖的 `rendertype_text*` 四个着色器已合并为
-  `core/text.vsh` / `core/text.fsh`，本包改为覆盖这两个文件（取自上游 Text Effects 的 `26_3/` overlay），
-  `pack.mcmeta` 锁在资源包格式 `97.1`。因为文件内容整体不同，zip 与 1.2.0 不再字节一致，
-  `resource-pack-sha1` 必须同步更新，否则客户端会因为哈希不符拒绝加载。
+* 插件：`api-version: '26.3'`、`version: 1.4.0-26.3`、Java 25 字节码。1.4.0 新增：
+  与 CraftEngine 的可选集成 —— 前缀/维度标签里可直接写 `<image:命名空间:id[:行:列]>` 渲染成
+  CE 图片图标（`/cp set Steve <image:default:icons:0:0>&c管理员`），全程反射调用 CE 公开 API，
+  没装 CE 的服务器行为不变；新增 `/cp ce` 状态指令与 `craftengine` 配置节。
+  既有功能口径不变：`/cp set` 的 `--rainbow` 开关、`/cp rainbow` 子命令、`/cp pack` 诊断。
+* 资源包：仍是 1.3.0 的包，本版未改（26.3 重写了文本渲染管道，旧版覆盖的 `rendertype_text*`
+  四个着色器已合并为 `core/text.vsh` / `core/text.fsh`，本包覆盖这两个文件（取自上游 Text Effects
+  的 `26_3/` overlay），`pack.mcmeta` 锁在资源包格式 `97.1`。因为文件内容整体不同，zip 与 1.2.0
+  不再字节一致，`resource-pack-sha1` 必须同步更新，否则客户端会因为哈希不符拒绝加载。
+  装了 CE 的服务器上，这个包的着色器要么合并进 CE 的资源包，要么彩虹自动回落到逐消息相位（见插件 README）。
 
 ## 怎么用这两个文件
 
@@ -30,7 +33,7 @@ v1.2.1 的 jar 与 1.2.0 的包，两者不能混用（`api-version`、字节码
 
 ```properties
 # server.properties
-resource-pack=https://github.com/kun433/ChatPrefix/releases/download/v1.3.0/ChatPrefix-Rainbow-1.3.0.zip
+resource-pack=https://github.com/kun433/ChatPrefix/releases/download/v1.4.0/ChatPrefix-Rainbow-1.3.0.zip
 resource-pack-sha1=d1037d36b3f5c197a47b4657ed52b80d365a25bf
 ```
 
@@ -38,9 +41,8 @@ resource-pack-sha1=d1037d36b3f5c197a47b4657ed52b80d365a25bf
 想用固定的 raw 链接也可以：
 
 ```properties
-resource-pack=https://raw.githubusercontent.com/kun433/ChatPrefix/v1.3.0/artifacts/ChatPrefix-Rainbow-1.3.0.zip
+resource-pack=https://raw.githubusercontent.com/kun433/ChatPrefix/v1.4.0/artifacts/ChatPrefix-Rainbow-1.3.0.zip
 ```
-
 装包后，插件对装了包的玩家把它看到的前缀整段刷成 `#F8F85C`，由 `core/text` 着色器渲染成
 原地滚动的彩虹；没装包的玩家不受影响，仍是逐消息相位彩虹。
 
@@ -51,21 +53,23 @@ resource-pack=https://raw.githubusercontent.com/kun433/ChatPrefix/v1.3.0/artifac
 /cp rainbow aaa_ovo off                 →  关掉彩虹，文字不动
 ```
 
-**排查**：进游戏执行 `/cp pack`，它会打印插件版本、三项 `pack.*` 配置、最近一次资源包状态事件、
-`hasResourcePack()`、`getResourcePackStatus()`、最终判定，以及你自己前缀的原文、彩虹开关，
-和这条前缀会不会走魔法色。客户端手动装包时服务端看不到，这种情形要把 `pack.detect` 改成 `always`。
+**排查**：进游戏执行 `/cp pack`（资源包判定细节）或 `/cp ce`（CraftEngine 集成状态），
+前者会打印插件版本、三项 `pack.*` 配置、最近一次资源包状态事件、`hasResourcePack()`、
+`getResourcePackStatus()`、最终判定，以及你自己前缀的原文、彩虹开关，和这条前缀会不会走魔法色；
+后者打印是否检测到 CE、`craftengine.mode/missing/shader-merged` 与反射通道状态。
+客户端手动装包时服务端看不到，这种情形要把 `pack.detect` 改成 `always`。
 
 ## 怎么重新生成
 
 ```powershell
 cd ..\26.3
-.\build.ps1                 # -> dist\ChatPrefix-1.3.0-26.3.jar（需要 JDK 25+）
+.\build.ps1                 # -> dist\ChatPrefix-1.4.0-26.3.jar（需要 JDK 25+）
 
 cd ..\resourcepack
 .\build-pack.ps1            # -> dist\ChatPrefix-Rainbow-1.3.0.zip，并打印 sha1
 
 cd ..
-.\tests\run-tests.ps1       # 85 条离线断言
+.\tests\run-tests.ps1       # 100 条离线断言
 ```
 
 重新生成后如果 SHA1 变了，记得同步更新 `server.properties` 里的 `resource-pack-sha1`
