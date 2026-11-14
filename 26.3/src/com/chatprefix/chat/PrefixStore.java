@@ -23,8 +23,15 @@ public final class PrefixStore {
      *
      * @param rainbow 彩虹开关（{@code /cp set ... --rainbow}）。true 时前缀按彩虹渲染，
      *                原文里不需要写 {@code <rainbow>}；与原文里手写的标签是「或」的关系。
+     * @param title   当前使用的称号 id（titles.yml 里的定义）；null 表示未用称号，
+     *                此时显示 prefix。prefix 为空串表示没有手动前缀（只用称号）。
      */
-    public record Entry(UUID uuid, String name, String prefix, boolean rainbow) {
+    public record Entry(UUID uuid, String name, String prefix, boolean rainbow, String title) {
+
+        /** 兼容旧代码的构造：没有称号。 */
+        public Entry(UUID uuid, String name, String prefix, boolean rainbow) {
+            this(uuid, name, prefix, rainbow, null);
+        }
     }
 
     private final File file;
@@ -51,15 +58,19 @@ public final class PrefixStore {
                 continue;
             }
             String prefix = section.getString("prefix");
-            if (prefix == null || prefix.isBlank()) {
+            String title = section.getString("title");
+            // 只有称号、没有手动前缀的记录也要保留（prefix 空串 + title 非空）
+            if ((prefix == null || prefix.isBlank()) && (title == null || title.isBlank())) {
                 continue;
             }
             UUID uuid = parseUuid(key);
             if (uuid == null) {
                 continue;
             }
-            entries.put(uuid, new Entry(uuid, section.getString("name", key), prefix,
-                    section.getBoolean("rainbow", false)));
+            entries.put(uuid, new Entry(uuid, section.getString("name", key),
+                    prefix == null ? "" : prefix,
+                    section.getBoolean("rainbow", false),
+                    title == null || title.isBlank() ? null : title));
         }
     }
 
@@ -73,6 +84,9 @@ public final class PrefixStore {
             // 关着就不写，老配置文件不会平白多出一行 false
             if (entry.rainbow()) {
                 yaml.set(path + ".rainbow", true);
+            }
+            if (entry.title() != null) {
+                yaml.set(path + ".title", entry.title());
             }
         }
         File parent = file.getParentFile();
@@ -96,8 +110,23 @@ public final class PrefixStore {
         set(uuid, name, prefix, false);
     }
 
+    /** /cp set 的写入：直接指定前缀原文，并清掉称号选择（显式覆盖）。 */
     public void set(UUID uuid, String name, String prefix, boolean rainbow) {
-        entries.put(uuid, new Entry(uuid, name, prefix, rainbow));
+        entries.put(uuid, new Entry(uuid, name, prefix, rainbow, null));
+    }
+
+    /**
+     * 更新当前使用的称号 id（null = 回到手动前缀）。
+     * 记录不存在时创建一条只有称号的记录（prefix 为空串）。
+     */
+    public Entry setTitle(UUID uuid, String name, String titleId) {
+        Entry current = entries.get(uuid);
+        Entry updated = current == null
+                ? new Entry(uuid, name == null ? uuid.toString() : name, "", false, titleId)
+                : new Entry(current.uuid(), name != null && !name.isBlank() ? name : current.name(),
+                        current.prefix(), current.rainbow(), titleId);
+        entries.put(uuid, updated);
+        return updated;
     }
 
     /** 删除并返回被删掉的记录，没有则返回 null。 */

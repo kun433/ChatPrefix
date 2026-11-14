@@ -34,6 +34,8 @@ public final class ChatSettings {
     private final String ceMode;
     private final String ceMissing;
     private final boolean ceShaderMerged;
+    private final boolean tabEnabled;
+    private final boolean tabShowDimension;
 
     private ChatSettings(String format, String prefixDefault, String prefixWrapper, String prefixColor,
                          boolean prefixAllowMiniMessage, int prefixMaxLength, boolean prefixRainbowAnimate,
@@ -42,7 +44,8 @@ public final class ChatSettings {
                          Map<String, String> dimensionColors, boolean nameUseDisplayName, String nameColor,
                          String separatorText, String separatorColor, boolean packEnabled,
                          String packMagicColor, String packDetect,
-                         String ceMode, String ceMissing, boolean ceShaderMerged) {
+                         String ceMode, String ceMissing, boolean ceShaderMerged,
+                         boolean tabEnabled, boolean tabShowDimension) {
         this.format = format;
         this.prefixDefault = prefixDefault;
         this.prefixWrapper = prefixWrapper;
@@ -65,6 +68,8 @@ public final class ChatSettings {
         this.ceMode = ceMode;
         this.ceMissing = ceMissing;
         this.ceShaderMerged = ceShaderMerged;
+        this.tabEnabled = tabEnabled;
+        this.tabShowDimension = tabShowDimension;
     }
 
     /** 内置默认值，等价于 config.yml 全部缺项时的结果（用空 Configuration 走同一套读取逻辑）。 */
@@ -106,7 +111,9 @@ public final class ChatSettings {
                 cfg.getString("pack.detect", "auto"),
                 cfg.getString("craftengine.mode", "auto"),
                 cfg.getString("craftengine.missing", "hide"),
-                cfg.getBoolean("craftengine.shader-merged", false));
+                cfg.getBoolean("craftengine.shader-merged", false),
+                cfg.getBoolean("tab.enabled", true),
+                cfg.getBoolean("tab.show-dimension", false));
     }
 
     /** 整行模板，占位符：{prefix} {dimension} {name} {separator} {message}。 */
@@ -195,6 +202,16 @@ public final class ChatSettings {
     /** 用户是否已把 ChatPrefix 的彩虹着色器合并进服务器的资源包（如 CE 的资源包）。 */
     public boolean ceShaderMerged() {
         return ceShaderMerged;
+    }
+
+    /** 是否把前缀同步到 Tab 列表与头顶名牌（主计分板队伍 prefix）。 */
+    public boolean tabEnabled() {
+        return tabEnabled;
+    }
+
+    /** Tab/头顶是否也显示维度标签。 */
+    public boolean tabShowDimension() {
+        return tabShowDimension;
     }
 
     /** 维度标签文案；主世界 / 下界 / 末地之外的维度用 custom-label 模板（{world} 为世界名）。 */

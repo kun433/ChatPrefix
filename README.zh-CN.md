@@ -1,4 +1,4 @@
-# ChatPrefix v1.4.0 — Paper 26.3 聊天前缀与维度标签插件
+# ChatPrefix v1.5.0 — Paper 26.3 聊天前缀与维度标签插件
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -20,7 +20,7 @@
 | --- | --- |
 | 服务端 | Paper 26.3（Paper API；不是纯 Spigot/Bukkit）；Leaf 26.3 同样可用 |
 | Java | 25 或更高（26.3 起服务端最低 Java 25） |
-| 插件版本 | `1.4.0-26.3` |
+| 插件版本 | `1.5.0-26.3` |
 
 编译目标是 `paper-api-26.3`（构建号 241），用的是 `io.papermc.paper.event.player.AsyncChatEvent` 与 Adventure 5.2.0
 组件，不碰 NMS，因此在 Paper 26.x 的小版本更新里照常可用。刻意不依赖 PlaceholderAPI；唯一的可选集成是
@@ -30,7 +30,7 @@ CraftEngine（见下文），全程走反射、只在 `plugin.yml` 里登记 `so
 
 ## 安装
 
-1. 把 `ChatPrefix-1.4.0-26.3.jar` 放进服务端的 `plugins/` 目录。
+1. 把 `ChatPrefix-1.5.0-26.3.jar` 放进服务端的 `plugins/` 目录。
 2. 重启服务器（或 `/reload confirm`）。首次启动会生成 `plugins/ChatPrefix/config.yml` 与 `prefixes.yml`。
 3. 给某位玩家设置前缀：`/chatprefix set aaa_ovo 本服`。
 4. 想要“一直变色”的彩虹前缀：`/chatprefix set aaa_ovo 炒鸡大牛 --rainbow`。
@@ -49,13 +49,65 @@ CraftEngine（见下文），全程走反射、只在 `plugin.yml` 里登记 `so
 | `/cp remove <玩家>` | 取消前缀，之后该玩家不显示前缀段。 |
 | `/cp get <玩家>` | 查看已存的前缀（含彩虹开关），并按聊天里的实际效果渲染出来。 |
 | `/cp list` | 列出所有已设置的前缀（最多 100 条），彩虹前缀带 `（彩虹）` 标记。 |
+| `/cp title list` | 列出称号池定义（titles.yml 里的全部称号）。 |
+| `/cp title grant <玩家> <称号>` | 把称号授权给玩家（可离线，授权记录持久化）。 |
+| `/cp title revoke <玩家> <称号>` | 收回授权；正在戴的会被摘下，回到手动前缀。 |
+| `/cp title set <玩家> <称号\|none>` | 直接指定玩家当前戴的称号（可绕过授权），none 摘下。 |
+| `/cp title info [玩家]` | 查看授权情况（不填玩家则列出全部）。 |
+| `/cp preview <文字> [--rainbow]` | 预览一段前缀文字的渲染效果，不落库。 |
 | `/cp pack` | 打印你自己的资源包判定细节（刷新前缀的彩虹没生效时先跑这个）。 |
 | `/cp ce` | 打印 CraftEngine 集成状态（前缀里的 `<image:...>` 图片没显示时先跑这个）。 |
-| `/cp reload` | 重载 `config.yml` 与 `prefixes.yml`，不用重启服务器。 |
+| `/cp reload` | 重载 `config.yml`、`prefixes.yml` 与 `titles.yml`，不用重启服务器。 |
 | `/cp help` | 显示用法。 |
 
-玩家参数可以是在线玩家，也可以是服务器还缓存着的离线玩家（上线过一次的）；名字支持 Tab 补全，
-`prefixes.yml` 里有记录但当前离线的名字也能补出来。
+所有玩家（无需 op）还可以用两个自己的称号指令：
+
+| 指令 | 作用 |
+| --- | --- |
+| `/cp titles` | 看看自己被授权了哪些称号、现在戴的是哪个。 |
+| `/cp use <称号\|none>` | 戴上 / 摘下称号；手动前缀不受影响，随时可切回。 |
+
+玩家参数可以是在线玩家，也可以是服务器还缓存着的离线玩家（上线过一次的）、或被授过称号的玩家；名字支持 Tab 补全。
+
+## 称号系统（v1.5.0）
+
+除了 op 直接 `/cp set` 之外，插件还内置了一套**称号池**：op 预定义一批称号并授权，玩家自己挑选佩戴。
+典型用法是 VIP / 会员 / 战绩称号这类「玩家可以在授权范围内自由切换」的称号。
+
+**第一步：定义称号**（`plugins/ChatPrefix/titles.yml`，改完 `/cp reload`）：
+
+```yaml
+titles:
+  vip:
+    text: "&6&lVIP"          # 写法与 /cp set 完全一致：& 颜色、MiniMessage、CE 图片、<rainbow> 都支持
+  boss:
+    text: "<image:default:crown>&c首领"
+    rainbow: true            # 这个称号默认按彩虹渲染
+```
+
+**第二步：授权与佩戴**：
+
+```text
+/cp title grant Steve vip     # 授权（可离线）
+/cp use vip                   # Steve 自己戴上，随时 /cp use none 摘下
+```
+
+规则：
+
+* **正在戴的称号优先于手动前缀**：称号定义改了（改文字、改颜色、加 CE 图片），所有戴着它的玩家立即跟着变，不需要重新佩戴。
+* 称号定义被删除时，戴着它的玩家自动回落到自己的手动前缀，不会显示坏掉的内容。
+* 手动前缀始终保留：摘下称号就回到它，两条记录互不覆盖；`/cp set` 是显式覆盖，会同时摘掉称号。
+* 收回授权（`title revoke`）时正在戴的称号会被摘下；被授权过但从未设置过前缀的玩家也能被离线授权。
+* 玩家自切只需要 `chatprefix.use` 权限（默认人人可用）；管理称号池需要 op（`chatprefix.admin`）。
+
+## Tab 列表与头顶前缀（v1.5.0）
+
+`tab.enabled: true`（默认开）时，插件用主计分板队伍把前缀同步到 **Tab 列表**和**头顶名牌**：
+有前缀的玩家在聊天、Tab、头顶三处都带前缀；`tab.show-dimension: true` 还能把维度标签也带上去
+（换世界自动刷新）。
+
+注意：主计分板队伍是全局唯一的，LuckPerms、TAB 这类同样接管队伍前缀的插件会与本功能互相覆盖，
+二选一（装了这类插件就把 `tab.enabled` 改成 `false`）。已在其它插件队伍里的玩家不会被抢走。
 
 ### 彩虹开关（`--rainbow`）
 
@@ -181,6 +233,11 @@ craftengine:
   mode: auto            # auto = 检测到 CE 在线时启用；on = 强制启用；off = 关闭
   missing: hide         # hide = 剧除渲染不了的 <image:...> 标签；literal = 保留原文本
   shader-merged: false  # 只有把 ChatPrefix 的彩虹着色器合并进服务器资源包后才改 true
+
+# 把前缀同步到 Tab 列表与头顶名牌（主计分板队伍）；与 LuckPerms/TAB 等队伍插件互斥，二选一
+tab:
+  enabled: true
+  show-dimension: false   # Tab/头顶是否也显示维度标签
 ```
 
 说明：
@@ -334,7 +391,7 @@ CE 会把它 `resources/<包>/resourcepack/` 里的文件按原路径合并进�
 
 ```powershell
 cd 26.3
-.\build.ps1          # 产物：dist\ChatPrefix-1.4.0-26.3.jar
+.\build.ps1          # 产物：dist\ChatPrefix-1.5.0-26.3.jar
 ```
 
 `build.ps1` 用 JDK 25 编译（`--release 25`），把 `build/classes` 与 `resources/*` 打进 jar。
@@ -357,7 +414,7 @@ cd 26.3
 
 ```powershell
 cd tests
-.\run-tests.ps1      # 100 条离线断言，不需要服务器
+.\run-tests.ps1      # 118 条离线断言，不需要服务器
 .\smoke-test.ps1     # 在 .testserver\263 起真实 Paper 26.3，用控制台喂指令验证（默认不跑）
 ```
 

@@ -7,7 +7,7 @@
 
 | 文件 | 用途 | 大小 | SHA1 |
 | --- | --- | --- | --- |
-| `ChatPrefix-1.4.0-26.3.jar` | 插件本体，放进服务器的 `plugins/` | 36490 B | `e11d3869a73f563fe056f45cc71fd9c3b3af387e` |
+| `ChatPrefix-1.5.0-26.3.jar` | 插件本体，放进服务器的 `plugins/` | 52962 B | `968fcbada09922b8222803c538c34656fedf3759` |
 | `ce-resources/chatprefix-rainbow/` | 彩虹着色器的 **CraftEngine 自托管版**（整个文件夹复制到服务器的 `plugins/CraftEngine/resources/` 下） | 36 个文件 | 文件与下面两个 zip 内容一致 |
 | `ChatPrefix-Rainbow-1.3.0-CE.zip` | 上面那个文件夹的 zip 版（解压后得到 `chatprefix-rainbow/`，方便下载） | 39097 B | `ca80316b915790ac56620368ae93af0b004b6bb7` |
 | `ChatPrefix-Rainbow-1.3.0.zip` | 传统独立资源包（没装 CE 的服 / 想自己托管时用） | 36895 B | `d1037d36b3f5c197a47b4657ed52b80d365a25bf` |
@@ -21,7 +21,7 @@
 **这一版是 26.3 专用的。** 服务端要 Paper/Leaf 26.3 + Java 25；还在 1.21.11 上的服务器请用
 v1.2.1 的 jar 与 1.2.0 的包，两者不能混用（`api-version`、字节码版本、着色器文件名都变了）。
 
-* 插件：`api-version: '26.3'`、`version: 1.4.0-26.3`、Java 25 字节码。1.4.0 新增：
+* 插件：`api-version: '26.3'`、`version: 1.5.0-26.3`、Java 25 字节码。1.4.0 新增 CraftEngine 集成；1.5.0 新增称号池与 Tab 同步：
   与 CraftEngine 的可选集成 —— 前缀/维度标签里可直接写 `<image:命名空间:id[:行:列]>` 渲染成
   CE 图片图标（`/cp set Steve <image:default:icons:0:0>&c管理员`），全程反射调用 CE 公开 API，
   没装 CE 的服务器行为不变；新增 `/cp ce` 状态指令与 `craftengine` 配置节。
@@ -44,7 +44,7 @@ v1.2.1 的 jar 与 1.2.0 的包，两者不能混用（`api-version`、字节码
 
 ```properties
 # server.properties
-resource-pack=https://github.com/kun433/ChatPrefix/releases/download/v1.4.0/ChatPrefix-Rainbow-1.3.0.zip
+resource-pack=https://github.com/kun433/ChatPrefix/releases/download/v1.5.0/ChatPrefix-Rainbow-1.3.0.zip
 resource-pack-sha1=d1037d36b3f5c197a47b4657ed52b80d365a25bf
 ```
 
@@ -52,7 +52,7 @@ resource-pack-sha1=d1037d36b3f5c197a47b4657ed52b80d365a25bf
 想用固定的 raw 链接也可以：
 
 ```properties
-resource-pack=https://raw.githubusercontent.com/kun433/ChatPrefix/v1.4.0/artifacts/ChatPrefix-Rainbow-1.3.0.zip
+resource-pack=https://raw.githubusercontent.com/kun433/ChatPrefix/v1.5.0/artifacts/ChatPrefix-Rainbow-1.3.0.zip
 ```
 装包后，插件对装了包的玩家把它看到的前缀整段刷成 `#F8F85C`，由 `core/text` 着色器渲染成
 原地滚动的彩虹；没装包的玩家不受影响，仍是逐消息相位彩虹。
@@ -74,7 +74,7 @@ resource-pack=https://raw.githubusercontent.com/kun433/ChatPrefix/v1.4.0/artifac
 
 ```powershell
 cd ..\26.3
-.\build.ps1                 # -> dist\ChatPrefix-1.4.0-26.3.jar（需要 JDK 25+）
+.\build.ps1                 # -> dist\ChatPrefix-1.5.0-26.3.jar（需要 JDK 25+）
 
 cd ..\resourcepack
 .\build-pack.ps1            # -> dist\ChatPrefix-Rainbow-1.3.0.zip（独立包）

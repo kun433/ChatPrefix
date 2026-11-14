@@ -97,3 +97,12 @@ craftengine:
   # plugins/CraftEngine/resources/ 下（CE 会把它合并进自托管的资源包并自动下发），
   # 然后把这里改成 true，CE 服的玩家就能看到原地流动的彩虹前缀。
   shader-merged: false
+
+# 把前缀同步到 Tab 列表与头顶名牌：用主计分板队伍（Team prefix）实现，
+# 有前缀的玩家在 Tab 与头顶都会看到前缀；没有前缀的玩家不受影响。
+# 注意：主计分板队伍是全局唯一的，LuckPerms / TAB 等同样接管队伍前缀的插件会与本功能互相覆盖，
+# 二选一（装了这类插件就把这里改成 false）。
+tab:
+  enabled: true
+  # Tab/头顶是否也显示维度标签（换世界时自动刷新）
+  show-dimension: false

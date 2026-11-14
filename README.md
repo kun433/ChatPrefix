@@ -1,4 +1,4 @@
-# ChatPrefix v1.4.0 — Chat Prefix and Dimension Tag for Paper 26.3
+# ChatPrefix v1.5.0 — Chat Prefix and Dimension Tag for Paper 26.3
 
 [English](README.md) | [中文](README.zh-CN.md)
 
@@ -21,7 +21,7 @@ player is in.
 | --- | --- |
 | Server | Paper 26.3 (Paper API, not Spigot/Bukkit-only); Leaf 26.3 works too |
 | Java | 25 or newer (26.3 servers require Java 25) |
-| Plugin version | `1.4.0-26.3` |
+| Plugin version | `1.5.0-26.3` |
 
 The plugin is built against `paper-api-26.3` (build 241) and uses
 `io.papermc.paper.event.player.AsyncChatEvent` plus Adventure 5.2.0 components. It does not use NMS,
@@ -34,7 +34,7 @@ connected purely through reflection with a `softdepend` entry — on a server wi
 
 ## Install
 
-1. Drop `ChatPrefix-1.4.0-26.3.jar` into the server's `plugins/` folder.
+1. Drop `ChatPrefix-1.5.0-26.3.jar` into the server's `plugins/` folder.
 2. Restart the server (or `/reload confirm`). `plugins/ChatPrefix/config.yml` and
    `prefixes.yml` are created on first start.
 3. Give an operator the prefix: `/chatprefix set aaa_ovo 本服`.
@@ -55,14 +55,74 @@ Everything is under one command, `chatprefix` (alias `cp`), and requires the
 | `/cp remove <player>` | Clears the prefix; the player then shows no prefix segment. |
 | `/cp get <player>` | Shows the stored prefix (and its rainbow switch), rendered as it appears in chat. |
 | `/cp list` | Lists every stored prefix (up to 100 lines); rainbow entries are marked `（彩虹）`. |
+| `/cp title list` | Lists the title pool definitions (from `titles.yml`). |
+| `/cp title grant <player> <title>` | Grants a title to a player (offline works; grants persist). |
+| `/cp title revoke <player> <title>` | Revokes the grant; a worn title is taken off automatically. |
+| `/cp title set <player> <title\|none>` | Forces the title a player currently wears (bypasses grants); `none` takes it off. |
+| `/cp title info [player]` | Shows grant status (all players if omitted). |
+| `/cp preview <text> [--rainbow]` | Previews how a prefix text renders, without storing anything. |
 | `/cp pack` | Prints your own resource-pack detection details (run this first when the rainbow does nothing). |
 | `/cp ce` | Prints the CraftEngine integration status (run this when an `<image:...>` prefix shows nothing). |
-| `/cp reload` | Reloads `config.yml` and `prefixes.yml` without restarting the server. |
+| `/cp reload` | Reloads `config.yml`, `prefixes.yml` and `titles.yml` without restarting the server. |
 | `/cp help` | Shows the usage summary. |
 
-The player argument accepts an online player, or an offline player the server still has cached
-(someone who has joined at least once). Names are also tab-completed, including players that only
-exist in `prefixes.yml`.
+Every player (no op needed) also gets two self-service title commands:
+
+| Command | What it does |
+| --- | --- |
+| `/cp titles` | Shows the titles you have been granted and which one you are wearing. |
+| `/cp use <title\|none>` | Puts a title on / takes it off; your manual prefix is untouched. |
+
+The player argument accepts an online player, an offline player the server still has cached, or a
+player with title grants; names are tab-completed.
+
+## The title system (v1.5.0)
+
+Besides the direct `/cp set`, the plugin ships a **title pool**: operators predefine titles and grant
+them, and players pick which one to wear. Typical use: VIP / member / achievement titles that players
+may switch freely within what they have been granted.
+
+**Step 1 — define titles** (`plugins/ChatPrefix/titles.yml`, then `/cp reload`):
+
+```yaml
+titles:
+  vip:
+    text: "&6&lVIP"          # same syntax as /cp set: & colours, MiniMessage, CE images, <rainbow>
+  boss:
+    text: "<image:default:crown>&cBOSS"
+    rainbow: true            # this title renders as a rainbow by default
+```
+
+**Step 2 — grant and wear**:
+
+```text
+/cp title grant Steve vip     # grant (offline works)
+/cp use vip                   # Steve puts it on; /cp use none takes it off any time
+```
+
+Rules:
+
+* **A worn title takes precedence over the manual prefix.** When you edit a title's definition,
+  everyone wearing it updates immediately — no need to re-grant or re-wear.
+* If a title definition is deleted, players wearing it fall back to their manual prefix
+  automatically; nothing broken is ever shown.
+* The manual prefix is always kept: taking a title off returns to it, and the two never overwrite each
+  other. `/cp set` is an explicit override and also takes the title off.
+* Revoking a grant removes the worn title immediately; players who have a grant but never had a prefix
+  can be granted offline.
+* Self-service only needs the `chatprefix.use` permission (default: everyone); managing the pool
+  needs op (`chatprefix.admin`).
+
+## Tab list and above-head prefix (v1.5.0)
+
+With `tab.enabled: true` (the default), the plugin syncs the prefix to the **Tab list** and the
+**above-head name tag** through a main-scoreboard team: players with a prefix wear it in chat, in Tab
+and above their head. `tab.show-dimension: true` also puts the dimension tag there (refreshed on world
+change).
+
+Note: the main scoreboard is global — LuckPerms, TAB and other plugins that take over team prefixes
+will fight this feature. Pick one (set `tab.enabled: false` if you run such a plugin). Players already
+in another plugin's team are left alone.
 
 ### The rainbow switch (`--rainbow`)
 
@@ -199,6 +259,12 @@ craftengine:
   mode: auto            # auto = enable when CE is detected; on = always; off = never
   missing: hide         # hide = drop unrenderable <image:...> tags; literal = keep the raw text
   shader-merged: false  # true only if you merged ChatPrefix's rainbow shader into the server's resource pack
+
+# Sync the prefix to the Tab list and above-head name tag (main-scoreboard team).
+# Mutually exclusive with LuckPerms/TAB-style team prefixes — pick one.
+tab:
+  enabled: true
+  show-dimension: false   # also show the dimension tag in Tab / above head
 ```
 
 Notes:
@@ -382,7 +448,7 @@ Only a JDK is needed — there is no Maven/Gradle build.
 
 ```powershell
 cd 26.3
-.\build.ps1          # -> dist\ChatPrefix-1.4.0-26.3.jar
+.\build.ps1          # -> dist\ChatPrefix-1.5.0-26.3.jar
 ```
 
 `build.ps1` compiles with JDK 25 (`--release 25`) and packs `build/classes` plus `resources/*`
@@ -406,15 +472,16 @@ build-numbered versions instead of `-R0.1-SNAPSHOT`, so the path is
 
 ```powershell
 cd tests
-.\run-tests.ps1      # 100 offline assertions, no server needed
+.\run-tests.ps1      # 118 offline assertions, no server needed
 .\smoke-test.ps1     # boots a real Paper 26.3 in .testserver\263 and drives it via console (opt-in)
 ```
 
 `run-tests.ps1` renders chat lines with `ChatFormatter` and asserts the exact plain text and colours
 for: prefix set/unset, all three dimensions, custom dimensions, `&`/MiniMessage parsing, the
 `--rainbow` switch, bracket colour following the text, the rainbow phase drift, the resource-pack
-magic-colour branch, colour precedence, custom templates, length accounting, the CraftEngine
-fallback behaviour, and the guarantee that player messages and player names are not parsed.
+magic-colour branch, colour precedence, custom templates, length accounting, title-pool round-trips
+and the title-over-prefix rendering precedence, the CraftEngine fallback behaviour, and the
+guarantee that player messages and player names are not parsed.
 
 `smoke-test.ps1` downloads the Paper 26.3 server jar on first run (it reuses an already cached
 vanilla jar if one is present), installs the plugin, starts the server, and checks from the console

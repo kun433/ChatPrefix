@@ -1,17 +1,19 @@
 name: ChatPrefix
 main: com.chatprefix.ChatPrefix
-version: 1.4.0-26.3
+version: 1.5.0-26.3
 api-version: '26.3'
-description: 在聊天栏给玩家名字前加上 op 分配的前缀，并标注玩家所在维度（主世界/下界/末地）。支持 CraftEngine 图片前缀。
+description: 在聊天栏给玩家名字前加上 op 分配的前缀，并标注玩家所在维度（主世界/下界/末地）。支持称号池、Tab/头顶前缀与 CraftEngine 图片前缀。
 author: ChatPrefix
 softdepend: [CraftEngine]
 commands:
   chatprefix:
-    description: 管理玩家聊天前缀。
-    usage: /chatprefix set <玩家> <文字> | remove <玩家> | get <玩家> | list | pack | ce | reload
+    description: 管理玩家聊天前缀与称号。
+    usage: /chatprefix help
     aliases: [cp]
-    permission: chatprefix.admin
 permissions:
   chatprefix.admin:
-    description: 允许设置与查看玩家聊天前缀。
+    description: 允许管理玩家的聊天前缀与称号（set/rainbow/remove/get/list/title/preview/pack/ce/reload）。
     default: op
+  chatprefix.use:
+    description: 允许玩家查看并切换自己被授权的称号（titles/use）。
+    default: true

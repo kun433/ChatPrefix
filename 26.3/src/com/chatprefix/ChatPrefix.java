@@ -11,6 +11,8 @@ import com.chatprefix.chat.ChatSettings;
 import com.chatprefix.chat.PrefixStore;
 import com.chatprefix.command.PrefixCommand;
 import com.chatprefix.craftengine.CraftEngineBridge;
+import com.chatprefix.tab.TabSync;
+import com.chatprefix.title.TitleStore;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.audience.Audience;
@@ -37,6 +39,32 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
     private volatile PrefixStore store;
     private volatile ChatFormatter formatter;
     private volatile ChatSettings settings;
+    private volatile TitleStore titleStore;
+    private volatile TabSync tabSync;
+
+    /** 渲染时实际使用的前缀：文本 + 是否按彩虹渲染。 */
+    public record ResolvedPrefix(String text, boolean rainbow) {
+    }
+
+    /**
+     * 解析「这个玩家此刻应该显示什么前缀」：正在使用的称号优先（定义被删时回落），
+     * 否则用手动前缀；两者都没有返回 null（不显示前缀段）。
+     */
+    public static ResolvedPrefix resolvePrefix(PrefixStore.Entry entry, TitleStore titles) {
+        if (entry == null) {
+            return null;
+        }
+        if (entry.title() != null && titles != null) {
+            TitleStore.Title title = titles.title(entry.title());
+            if (title != null) {
+                return new ResolvedPrefix(title.text(), title.rainbow() || entry.rainbow());
+            }
+        }
+        if (entry.prefix() == null || entry.prefix().isBlank()) {
+            return null;
+        }
+        return new ResolvedPrefix(entry.prefix(), entry.rainbow());
+    }
 
     /**
      * 玩家最近一次上报的资源包状态。客户端把包手动放进 resourcepacks 文件夹时服务端是看不到的，
@@ -48,9 +76,15 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
     public void onEnable() {
         saveDefaultConfig();
         store = new PrefixStore(new File(getDataFolder(), "prefixes.yml"));
+        titleStore = new TitleStore(new File(getDataFolder(), "titles.yml"));
         reloadAll();
 
         getServer().getPluginManager().registerEvents(this, this);
+
+        // Tab/头顶前缀同步：注册一次监听，开关变化在 update() 里逐次检查
+        tabSync = new TabSync(this);
+        getServer().getPluginManager().registerEvents(tabSync, this);
+        tabSync.refreshAll();
 
         PluginCommand command = getCommand("chatprefix");
         if (command == null) {
@@ -64,7 +98,8 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
         // 26.3 起 getDescription() 被标为过时，Paper 的替代是 getPluginMeta()
         boolean ce = CraftEngineBridge.pluginPresent();
         getLogger().info("已启用 ChatPrefix " + getPluginMeta().getVersion()
-                + "：前缀 " + store.size() + " 条，模板 " + settings.format()
+                + "：前缀 " + store.size() + " 条，称号 " + titleStore.titleCount() + " 个，模板 " + settings.format()
+                + "；Tab 同步 " + (settings.tabEnabled() ? "开" : "关")
                 + "；资源包分支 " + (settings.packEnabled()
                         ? "开（检测 " + settings.packDetect() + "，魔法色 " + settings.packMagicColor() + "）"
                         : "关")
@@ -75,14 +110,25 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
     @Override
     public void onDisable() {
         PrefixStore current = store;
-        if (current == null) {
-            return;
+        if (current != null) {
+            try {
+                current.save();
+            } catch (IOException ex) {
+                getLogger().warning("关闭时写入 prefixes.yml 失败：" + ex.getMessage());
+            }
         }
-        try {
-            current.save();
-        } catch (IOException ex) {
-            getLogger().warning("关闭时写入 prefixes.yml 失败：" + ex.getMessage());
+        TabSync sync = tabSync;
+        if (sync != null) {
+            sync.cleanup();
         }
+    }
+
+    public TitleStore titles() {
+        return titleStore;
+    }
+
+    public TabSync tabSync() {
+        return tabSync;
     }
 
     /** 重读 config.yml 与 prefixes.yml，供 /chatprefix reload 使用。 */
@@ -94,6 +140,12 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
         this.formatter = new ChatFormatter(loaded, CraftEngineBridge.imageTagResolver(
                 ceActive(loaded), "literal".equalsIgnoreCase(loaded.ceMissing())));
         this.store.load();
+        if (titleStore != null) {
+            titleStore.load();
+        }
+        if (tabSync != null) {
+            tabSync.refreshAll();
+        }
     }
 
     /**
@@ -140,9 +192,10 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
         final World.Environment environment = world.getEnvironment();
         final String worldName = world.getName();
         final PrefixStore.Entry entry = store.get(player.getUniqueId());
-        final String prefixRaw = entry == null ? null : entry.prefix();
-        // 彩虹开关随前缀存在 prefixes.yml 里，聊天时按记录当场定型
-        final boolean prefixRainbow = entry != null && entry.rainbow();
+        // 称号优先于手动前缀；解析结果当场定型
+        final ChatPrefix.ResolvedPrefix resolved = resolvePrefix(entry, titleStore);
+        final String prefixRaw = resolved == null ? null : resolved.text();
+        final boolean prefixRainbow = resolved != null && resolved.rainbow();
         final ChatFormatter current = formatter;
         final boolean useDisplayName = settings.nameUseDisplayName();
         // 相位在消息发出的这一刻定型，同一条消息对所有接收者一致

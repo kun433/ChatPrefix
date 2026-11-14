@@ -1,10 +1,13 @@
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import com.chatprefix.ChatPrefix;
 import com.chatprefix.chat.ChatFormatter;
 import com.chatprefix.chat.ChatSettings;
+import com.chatprefix.chat.PrefixStore;
 import com.chatprefix.craftengine.CraftEngineBridge;
+import com.chatprefix.title.TitleStore;
 import com.chatprefix.util.Text;
 
 import net.kyori.adventure.text.Component;
@@ -332,6 +335,107 @@ public final class FormatTest {
                 ChatPrefix.ceActive(settings("craftengine.mode", "off"))
                         + "/" + ChatPrefix.ceActive(settings("craftengine.mode", "on"))
                         + "/" + ChatPrefix.ceActive(settings("craftengine.mode", "auto")));
+
+        System.out.println();
+        System.out.println("== 称号池（v1.5.0）==");
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("cptest");
+            TitleStore titles = new TitleStore(dir.resolve("titles.yml").toFile());
+            // 先写一份定义再 load，模拟 op 手编 titles.yml
+            java.nio.file.Files.writeString(dir.resolve("titles.yml"), """
+                    titles:
+                      vip:
+                        text: "&6&lVIP"
+                      boss:
+                        text: "&cBOSS"
+                        rainbow: true
+                    grants:
+                      11111111-2222-3333-4444-555555555555:
+                        name: Steve
+                        titles: [vip, boss, gone]
+                    """);
+            titles.load();
+            eq("称号定义读取（含彩虹标记，id 统一小写）", "vip/false, boss/true",
+                    titles.title("vip").id() + "/" + titles.title("vip").rainbow()
+                            + ", " + titles.title("BOSS").id() + "/" + titles.title("boss").rainbow());
+            eq("称号 id 不区分大小写", "boss", titles.title("BoSs").id());
+            eq("授权列表过滤掉已删除的定义", "vip,boss", titles.titlesOf(
+                    UUID.fromString("11111111-2222-3333-4444-555555555555"))
+                    .stream().map(TitleStore.Title::id).reduce((a, b) -> a + "," + b).orElse(""));
+            eq("未授权玩家拿不到称号", "[]",
+                    String.valueOf(titles.titlesOf(UUID.fromString("99999999-9999-9999-9999-999999999999"))));
+            UUID alex = UUID.randomUUID();
+            eq("grant 幂等", "true/false", titles.grant(alex, "Alex", "vip")
+                    + "/" + titles.grant(alex, "Alex", "vip"));
+            eq("grant 不存在的称号返回 false", "false",
+                    String.valueOf(titles.grant(UUID.randomUUID(), "Alex", "nope")));
+            eq("revoke 后 titlesOf 变化", "false/true",
+                    String.valueOf(titles.revoke(UUID.fromString("11111111-2222-3333-4444-555555555555"), "nope"))
+                            + "/" + titles.revoke(UUID.fromString("11111111-2222-3333-4444-555555555555"), "vip"));
+            eq("按名字查授权（含离线玩家）", "11111111-2222-3333-4444-555555555555",
+                    String.valueOf(titles.findGrantUuidByName("STEVE")));
+            titles.save();
+            TitleStore reloaded = new TitleStore(dir.resolve("titles.yml").toFile());
+            reloaded.load();
+            eq("save/load 往返：定义与授权都在", "2/2",
+                    reloaded.titleCount() + "/" + reloaded.allGrants().size());
+
+            // 渲染优先级：正在使用的称号 > 手动前缀 > 无
+            TitleStore pool = new TitleStore(new java.io.File(dir.toFile(), "t2.yml"));
+            pool.load();
+            // 重建：grant 用的临时 store 没落盘定义，直接手工写入
+            java.nio.file.Files.writeString(dir.resolve("t2.yml"), """
+                    titles:
+                      vip:
+                        text: "&6&lVIP"
+                        rainbow: true
+                    """);
+            pool.load();
+            UUID u = UUID.randomUUID();
+            PrefixStore.Entry manual = new PrefixStore.Entry(u, "Steve", "&c手动", false, null);
+            PrefixStore.Entry titled = new PrefixStore.Entry(u, "Steve", "&c手动", false, "vip");
+            PrefixStore.Entry brokenTitle = new PrefixStore.Entry(u, "Steve", "&c手动", false, "gone");
+            PrefixStore.Entry titleOnly = new PrefixStore.Entry(u, "Steve", "", false, "vip");
+            eq("无称号：用手动前缀", "&c手动/false",
+                    ChatPrefix.resolvePrefix(manual, pool).text() + "/" + ChatPrefix.resolvePrefix(manual, pool).rainbow());
+            ChatPrefix.ResolvedPrefix byTitle = ChatPrefix.resolvePrefix(titled, pool);
+            eq("称号优先于手动前缀，彩虹取称号定义", "&6&lVIP/true",
+                    byTitle.text() + "/" + byTitle.rainbow());
+            ChatPrefix.ResolvedPrefix fallback = ChatPrefix.resolvePrefix(brokenTitle, pool);
+            eq("称号定义被删：回落到手动前缀", "&c手动/false",
+                    fallback.text() + "/" + fallback.rainbow());
+            eq("只有称号没有手动前缀：显示称号", "&6&lVIP",
+                    ChatPrefix.resolvePrefix(titleOnly, pool).text());
+            eq("没有任何前缀：null（不显示前缀段）", "null",
+                    String.valueOf(ChatPrefix.resolvePrefix(new PrefixStore.Entry(u, "Steve", "", false, null), pool)));
+            eq("entry 为 null：null", "null", String.valueOf(ChatPrefix.resolvePrefix(null, pool)));
+
+            // PrefixStore：title 字段往返 + 只有称号的记录不被丢
+            java.nio.file.Path pstore = dir.resolve("prefixes.yml");
+            PrefixStore store2 = new PrefixStore(pstore.toFile());
+            store2.set(u, "Steve", "&c手动", false);
+            store2.setTitle(u, "Steve", "vip");
+            store2.save();
+            PrefixStore store3 = new PrefixStore(pstore.toFile());
+            store3.load();
+            PrefixStore.Entry back = store3.get(u);
+            eq("setTitle 写盘后再读：prefix 保留 + title 在", "&c手动/vip",
+                    back.prefix() + "/" + back.title());
+            UUID u2 = UUID.randomUUID();
+            store3.setTitle(u2, "Alex", "vip");
+            store3.save();
+            PrefixStore store4 = new PrefixStore(pstore.toFile());
+            store4.load();
+            eq("只有称号的记录不会被 load 丢弃", "vip",
+                    store4.get(u2).title());
+            store4.setTitle(u2, "Alex", null);
+            eq("摘下称号后 prefix 为空：解析为 null", "null",
+                    String.valueOf(ChatPrefix.resolvePrefix(store4.get(u2), pool)));
+            java.nio.file.Files.walk(dir).sorted(java.util.Comparator.reverseOrder())
+                    .forEach(p -> p.toFile().delete());
+        } catch (java.io.IOException ex) {
+            eq("称号池临时文件测试", "IO 异常：" + ex.getMessage(), "无");
+        }
 
         System.out.println();
         System.out.println("===== 结果：" + passed + " 通过 / " + failed + " 失败 =====");
