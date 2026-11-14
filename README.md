@@ -330,9 +330,10 @@ which needs no resource pack at all.
 
 To get the in-place rainbow on a CE server, hand the shaders to CE instead of shipping a separate zip:
 
-1. Copy the whole `resourcepack/dist/ce-resources/chatprefix-rainbow/` folder into the server's
-   `plugins/CraftEngine/resources/` directory (`artifacts/ce-resources/` holds the same folder, and
-   the release ships it as `ChatPrefix-Rainbow-1.3.0-CE.zip`; all three are identical);
+1. Copy the whole `chatprefix-rainbow/` folder into the server's `plugins/CraftEngine/resources/`
+   directory (you can copy the `resourcepack/` directory itself — it already is a CE pack — or take
+   `artifacts/ce-resources/`, or unpack the release's `ChatPrefix-Rainbow-1.3.0-CE.zip`; the contents
+   are identical);
 2. Run `/ce reload all` (or restart); CE merges the shaders into the pack it generates and pushes
    automatically;
 3. Set `craftengine.shader-merged: true` to bring the magic-colour path back.
@@ -346,9 +347,12 @@ A chat line is frozen the moment the client receives it, so no plugin can recolo
 which means the "flow" you get from `prefix.rainbow` is really the phase advancing once per message.
 Real in-place animation needs the client's core shaders to take part.
 
-`resourcepack/` holds a trimmed pack derived from TheSalt_'s Text Effects (MIT). It overrides the
-`core/text.vsh` / `core/text.fsh` core shader and renders the colour `#F8F85C` as a continuously
-scrolling rainbow.
+`resourcepack/` is a **pure CraftEngine self-hosted pack**: the directory itself follows CE's pack
+layout (`pack.yml` plus `resourcepack/assets/...`), derived from TheSalt_'s Text Effects (MIT). It
+overrides the `core/text.vsh` / `core/text.fsh` core shader and renders the colour `#F8F85C` as a
+continuously scrolling rainbow. The standalone resource-pack zip is retired: on a CE server the
+pack slot belongs to CE, so a standalone zip can never be pushed; on servers without CE the rainbow
+uses the per-message phase drift and never needed this pack.
 
 > 26.3 rewrote the text rendering pipeline: the four old `rendertype_text*` shaders collapsed into a
 > single `core/text.*` pair, now using `#include <minecraft:...>` and explicit `layout(location)`.
@@ -357,32 +361,29 @@ scrolling rainbow.
 
 ```powershell
 cd resourcepack
-.\build-pack.ps1     # -> dist\ChatPrefix-Rainbow-1.3.0.zip, and prints the sha1;
-                     # also emits dist\ce-resources\chatprefix-rainbow\ (the CE self-hosted folder)
+.\build-pack.ps1     # -> dist\ce-resources\chatprefix-rainbow\ (the CE self-hosted folder)
+                     # -> dist\ChatPrefix-Rainbow-1.3.0-CE.zip (the same folder zipped, for the release)
 ```
 
-### On a server with CraftEngine: let CE self-host it (recommended, no zip needed)
+### Let CraftEngine self-host it (the only route)
 
 CE merges everything under `resources/<pack>/resourcepack/` into the resource pack it generates and
 hosts itself — shaders included, verbatim (`exclude-core-shaders` is false by default). So:
 
-1. Copy the whole `resourcepack/dist/ce-resources/chatprefix-rainbow/` folder into the server's
-   `plugins/CraftEngine/resources/` directory.
+1. Copy the whole `chatprefix-rainbow/` folder into the server's `plugins/CraftEngine/resources/`
+   directory.
 2. Run `/ce reload all` (or restart); CE rebuilds its resource pack and pushes it to players
    automatically.
 3. Set `craftengine.shader-merged: true` in the plugin config so rainbow prefixes take the
    magic-colour branch again.
 
 After that the `server.properties` pack URL and sha1 are no longer needed (CE takes over), and
-players don't install anything themselves. The folder is byte-identical to the zip shaders (same
-sources, same build script); it just drops `pack.mcmeta` (CE writes its own) and adds CE's
-`pack.yml`. Note: if you also run the full Text_Effects pack, both provide `include/_config.glsl`
-and will collide — keep one of them.
+players don't install anything themselves. `pack.mcmeta` is written by CE (resource-pack format
+97.1, i.e. Minecraft 26.3); the source tree only carries CE's `pack.yml`. Note: if you also run the
+full Text_Effects pack, both provide `include/_config.glsl` and will collide — keep one of them.
 
-### Without CE: the classic zip route
-
-The 1.3.0 pack is **no longer byte-identical** to 1.2.0, so upgraded servers must redistribute it
-(and update `resource-pack-sha1`):
+The 1.3.0 shaders are **no longer byte-identical** to 1.2.0; once CE rebuilds its pack, clients
+re-download automatically:
 
 * The trigger now uses `TEXT_EFFECT_WITH_SHADOW`. Chat lines are drawn with a shadow; matching only
   the main colour left a dark yellow shadow around the rainbow.
@@ -391,8 +392,7 @@ The 1.3.0 pack is **no longer byte-identical** to 1.2.0, so upgraded servers mus
 
 How it fits together:
 
-1. Deliver the zip to players (via `server.properties` `resource-pack=` plus `resource-pack-sha1=`,
-   or Paper's resource-pack settings).
+1. CE merges the shaders into the pack it hosts and pushes to players.
 2. For every player who has the pack, the plugin repaints the whole prefix they see with `#F8F85C`
    and the shader turns it into an in-place scrolling rainbow. **Players without the pack are
    unaffected** and keep the per-message phase rainbow.
@@ -408,7 +408,7 @@ Caveats:
 
 * The pack overrides `core/text.*`, so it is **mutually exclusive with any other pack that
   overrides that shader**.
-* `pack.mcmeta` pins `min_format`/`max_format` to 97.1, i.e. Minecraft 26.3 (resource pack formats
+* CE writes the pack's `pack.mcmeta` at format 97.1, i.e. Minecraft 26.3 (resource pack formats
   became major.minor from 1.21.9 on).
 * Licensed MIT; `resourcepack/LICENSE-Text_Effects.txt` must ship with the pack. See
   `resourcepack/CREDITS.md` for exactly what was trimmed.
@@ -500,7 +500,7 @@ default.
 * `plugin.yml`: `version: 1.3.0-26.3`, `api-version: '26.3'` (Paper documents 26.3 as the highest
   valid value).
 * Resource pack: core shaders are byte-identical to upstream Text Effects' `26_3/` overlay, every
-  `#include` resolves against the pack or vanilla 26.3, and `pack.mcmeta` is pinned to 97.1.
+  `#include` resolves against the pack or vanilla 26.3, and the pack targets format 97.1.
 * Not yet verified: a real server boot (plugin load and command replies) and what a player actually
   sees. Both need a live server and client; run `tests\smoke-test.ps1` and join the game if you want
   that confirmation.

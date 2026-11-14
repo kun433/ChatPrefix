@@ -1,7 +1,7 @@
-# 资源包里的着色器必须保持 LF 行尾：
-# 打包脚本按工作区文件逐字节写进 zip，行尾一变 zip 的 SHA1 就漂，server.properties 里的
-# resource-pack-sha1 会立刻失效。core.autocrlf=true 的机器上尤其要注意。
+# 资源包里的着色器与 pack.yml 必须保持 LF 行尾：
+# 打包脚本按工作区文件逐字节写进 zip，行尾一变重新打包的 zip SHA1 就漂，
+# Release 附件哈希与客户端校验都会失效。core.autocrlf=true 的机器上尤其要注意。
 *.glsl   text eol=lf
 *.vsh    text eol=lf
 *.fsh    text eol=lf
-*.mcmeta text eol=lf
+pack.yml text eol=lf

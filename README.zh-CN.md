@@ -292,9 +292,9 @@ CE 占用着服务器的资源包槽位，ChatPrefix 的彩虹着色器不在里
 
 想要 CE 服上也有**原地流动的彩虹**，把着色器交给 CE 自托管（不需要再单独发 zip）：
 
-1. 把 `resourcepack/dist/ce-resources/chatprefix-rainbow/` 整个文件夹复制到服务器的
-   `plugins/CraftEngine/resources/` 下（也可以直接从 `artifacts/ce-resources/` 拿，或下载 Release 里的
-   `ChatPrefix-Rainbow-1.3.0-CE.zip` 解压，三份内容相同）；
+1. 把 `chatprefix-rainbow/` 整个文件夹复制到服务器的 `plugins/CraftEngine/resources/` 下
+   （可以直接复制 `resourcepack/` 目录本身、从 `artifacts/ce-resources/` 拿，或下载 Release 里的
+   `ChatPrefix-Rainbow-1.3.0-CE.zip` 解压，内容完全一致）；
 2. 执行 `/ce reload all`（或重启服务器），CE 会把这些着色器合并进它生成并自动下发的资源包；
 3. 把 `craftengine.shader-merged` 改成 `true`，恢复魔法色路径。
 
@@ -306,8 +306,11 @@ CE 侧不需要改任何配置（`exclude-core-shaders` 默认就是 false，不
 聊天行一旦发出，客户端就把它定死了，插件无法原地改色 —— 所以 `prefix.rainbow` 做出来的「流动」
 本质是逐条消息推进相位。想要**真正的原地动画**，只能让客户端的内核着色器参与。
 
-`resourcepack/` 里是一个裁剪版资源包，派生自 TheSalt_ 的 Text Effects（MIT）。它覆盖
+`resourcepack/` 是一个**纯 CraftEngine 自托管包**：目录本身就是 CE 的包结构（`pack.yml` +
+`resourcepack/assets/...`），内容派生自 TheSalt_ 的 Text Effects（MIT）。它覆盖
 `core/text.vsh` / `core/text.fsh` 核心着色器，把颜色 `#F8F85C` 渲染成持续滚动的彩虹。
+独立的资源包 zip 已经废弃：装了 CE 的服务器资源包槽位被 CE 占用，独立包发不出去；没装 CE 的
+服务器彩虹走逐消息相位，本来也不需要这个包。
 
 > 26.3 重写了文本渲染管道（旧版的 `rendertype_text` / `rendertype_text_intensity*` 四个着色器已合并成
 > 单一的 `core/text.*`，改用 `#include <minecraft:...>` 与显式 `layout(location)`），
@@ -315,38 +318,34 @@ CE 侧不需要改任何配置（`exclude-core-shaders` 默认就是 false，不
 
 ```powershell
 cd resourcepack
-.\build-pack.ps1     # 产物：dist\ChatPrefix-Rainbow-1.3.0.zip，同时打印 sha1；
-                     # 同时产出 dist\ce-resources\chatprefix-rainbow\（CE 自托管版文件夹）
+.\build-pack.ps1     # 产物：dist\ce-resources\chatprefix-rainbow\（CE 自托管文件夹）
+                     #       dist\ChatPrefix-Rainbow-1.3.0-CE.zip（上面文件夹的 zip，Release 附件用）
 ```
 
-### 服务器装了 CraftEngine：交给 CE 自托管（推荐，不用 zip）
+### 交给 CraftEngine 自托管（唯一方式）
 
 CE 会把它 `resources/<包>/resourcepack/` 里的文件按原路径合并进自己生成并自动托管的资源包，
 连着色器也会原样带上（`exclude-core-shaders` 默认就是 false）。所以只要：
 
-1. 把 `resourcepack/dist/ce-resources/chatprefix-rainbow/` 整个文件夹复制到服务器的
-   `plugins/CraftEngine/resources/` 目录下；
+1. 把 `chatprefix-rainbow/` 整个文件夹复制到服务器的 `plugins/CraftEngine/resources/` 目录下；
 2. 执行 `/ce reload all`（或重启服务器），CE 重新生成资源包并自动下发给玩家；
 3. 把插件配置的 `craftengine.shader-merged` 改成 `true`，让彩虹前缀恢复走魔法色分支。
 
 之后不再需要 `server.properties` 里的资源包地址和 sha1（CE 全权接管），玩家也不用自己装包。
-这个文件夹与 zip 内容完全一致（同一套着色器源，同一个构建脚本产出），只是去掉了 pack.mcmeta
-（由 CE 生成）并补了一个 CE 的 `pack.yml`。注意：如果你另外装了完整的 Text Effects 资源包，
-两边都有 `include/_config.glsl`，会撞文件，用其中一个就好。
+`pack.mcmeta` 由 CE 生成（资源包格式锁 97.1，即 Minecraft 26.3），源码里只需要 CE 的 `pack.yml`。
+注意：如果你另外装了完整的 Text Effects 资源包，两边都有 `include/_config.glsl`，会撞文件，
+用其中一个就好。
 
-### 没装 CE：传统的 zip 方式
-
-1.3.0 的资源包与 1.2.0 **不再字节一致**，升过级的服要重新下发（`resource-pack-sha1` 也得换）：
+1.3.0 的着色器与 1.2.0 **不再字节一致**，CE 重新生成资源包后客户端会自动重新下载：
 
 * 触发色改用 `TEXT_EFFECT_WITH_SHADOW`。聊天行默认带阴影，只匹配主色的话彩虹旁边会留一圈暗黄的阴影。
 * `apply_effect.glsl` 的彩虹分支对阴影层乘 0.25，否则阴影会变成与正文一样亮的一层，看起来像重影。
 
 生效链路：
 
-1. 把 zip 下发给玩家（`server.properties` 的 `resource-pack=` + `resource-pack-sha1=`，
-   或用 Paper 的资源包配置）。
+1. CE 把着色器合并进自托管资源包下发给玩家。
 2. 插件对**装了包的玩家**把它看到的前缀整段刷成 `#F8F85C`，由着色器渲染成原地流动的彩虹；
-   **没装包的玩家完全不受影响**，仍是逐消息相位彩虹。
+   **没装到包的玩家完全不受影响**，仍是逐消息相位彩虹。
 3. 只有「裸 `<rainbow>`」或「`--rainbow` 开关」才会走这条分支；`<rainbow:2>` 这种带相位的写法
    表示「要固定彩虹」，两条路径一致。
 
@@ -356,7 +355,7 @@ CE 会把它 `resources/<包>/resourcepack/` 里的文件按原路径合并进�
 注意：
 
 * 这个包覆盖 `core/text.*`，**与任何同样覆盖该着色器的资源包互斥**。
-* `pack.mcmeta` 的范围锁在 `min_format`/`max_format` = 97.1，即 Minecraft 26.3（1.21.9 起资源包格式改成 主.次 两段）。
+* CE 生成的 `pack.mcmeta` 锁在资源包格式 97.1，即 Minecraft 26.3（1.21.9 起资源包格式改成 主.次 两段）。
 * 许可为 MIT，`resourcepack/LICENSE-Text_Effects.txt` 必须随包保留；派生说明见
   `resourcepack/CREDITS.md`。
 * 已做的静态校核：核心着色器与上游 26.3 版逐字节一致，`#include` 依赖全部能在包里或原版 26.3 里解析；
@@ -436,6 +435,6 @@ cd tests
   `getDescription()` 在 26.3 被标为过时，两处已换成 `getPluginMeta().getVersion()`。
 * `plugin.yml`：`version: 1.3.0-26.3`、`api-version: '26.3'`（Paper 文档写明的合法上限就是 26.3）。
 * 资源包：核心着色器取自上游 Text Effects 的 `26_3/` overlay，逐字节未改；
-  `#include` 依赖全部能在包内或原版 26.3 里解析；`pack.mcmeta` 锁在 97.1。
+  `#include` 依赖全部能在包内或原版 26.3 里解析；资源包格式锁 97.1。
 * 尚未验证：真机进服（插件加载与指令回显）与真人看到的画面。这两步都要真实服务端与客户端，
   离线环境做不到；如需确认，手动跑 `tests\smoke-test.ps1` 并进服看一眼彩虹。
