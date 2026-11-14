@@ -29,6 +29,16 @@ import org.bukkit.Bukkit;
  *   <li>CE 不在线时按 config 的 {@code craftengine.missing} 剔除或保留原文本。</li>
  * </ol>
  *
+ * <p>两个关键实现约束（针对真实 CE 服务端验证过，CE 26.9.2）：
+ * <ul>
+ *   <li>CE 是 paper-plugin（隔离类加载器），ChatPrefix 自己的类加载器看不到 CE 的类，
+ *       必须拿到 CE 的 {@link org.bukkit.plugin.Plugin} 实例后用它的类加载器解析；</li>
+ *   <li>CE 26.x 起 {@code Image.componentAt} 返回 CE 自带（shaded）的 adventure Component，
+ *       不能强转回 kyori Component；改用 {@code Image.codepointAt} 拿码点，再用
+ *       {@code BitmapImage.font()} 里的字体 Key 用 kyori API 原样重建
+ *       {@code Component.text(char).font(key)}（与 CE 的 componentAt 逐字段等价）。</li>
+ * </ul>
+ *
  * <p>所有反射调用都在渲染线程发生（聊天渲染是异步的），Method 对象只解析一次；
  * CE 重载后图片码位变化也能跟随，因为每次渲染都现查 CE 的注册表。
  */
@@ -44,9 +54,11 @@ public final class CraftEngineBridge {
     private static volatile boolean usable;
     private static Method keyOf;
     private static Method imagesById;
-    private static Method imageComponentAt;
+    private static Method imageCodepointAt;
     private static Method fontManagerInstance;
     private static Method imageByIdValue;
+    /** 从 Image 实现类拿字体 Key 的访问器（BitmapImage.font()；ReferenceImage 要先 image() 退一层），按具体类缓存。 */
+    private static final java.util.Map<Class<?>, FontAccessor> FONT_ACCESSORS = new java.util.HashMap<>();
 
     /** <image:...> 标签体内允许的 id 片段；用于区分「简单形式」与带格式参数的复杂形式。 */
     private static final Pattern ID_PART = Pattern.compile("[A-Za-z0-9_\\-.]+");
@@ -94,10 +106,53 @@ public final class CraftEngineBridge {
             if (image == null) {
                 return null;
             }
-            return (Component) imageComponentAt.invoke(image, row, col);
+            // CE 26.x 的 componentAt 返回它 shaded 的 adventure Component，不能直接用；
+            // 这里复刻它的实现：码点字符 + 图片所属字体（见类注释）。
+            int codepoint = (Integer) imageCodepointAt.invoke(image, row, col);
+            if (codepoint <= 0) {
+                return null;
+            }
+            return Component.text(new String(Character.toChars(codepoint)))
+                    .font(fontKeyOf(image));
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /** 拿图片的字体 Key；拿不到（API 形状又变了）返回 null，退回默认字体。 */
+    private static net.kyori.adventure.key.Key fontKeyOf(Object image) {
+        try {
+            Object fontKey = fontAccessor(image.getClass()).get(image);
+            return fontKey == null ? null : net.kyori.adventure.key.Key.key(fontKey.toString());
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @FunctionalInterface
+    private interface FontAccessor {
+        Object get(Object image) throws Exception;
+    }
+
+    private static synchronized FontAccessor fontAccessor(Class<?> imageClass) throws ReflectiveOperationException {
+        FontAccessor cached = FONT_ACCESSORS.get(imageClass);
+        if (cached != null) {
+            return cached;
+        }
+        FontAccessor accessor;
+        try {
+            Method font = imageClass.getMethod("font");
+            accessor = font::invoke;
+        } catch (NoSuchMethodException e) {
+            // ReferenceImage 包装真正的图片：先 image() 退一层再 font()
+            Method unwrap = imageClass.getMethod("image");
+            accessor = img -> {
+                Object inner = unwrap.invoke(img);
+                return inner == null ? null : fontAccessor(inner.getClass()).get(inner);
+            };
+        }
+        FONT_ACCESSORS.put(imageClass, accessor);
+        return accessor;
     }
 
     /**
@@ -175,18 +230,27 @@ public final class CraftEngineBridge {
                 return usable;
             }
             try {
-                Class<?> key = Class.forName("net.momirealms.craftengine.core.util.Key");
-                Class<?> images = Class.forName("net.momirealms.craftengine.bukkit.api.CraftEngineImages");
-                Class<?> font = Class.forName("net.momirealms.craftengine.core.font.Image");
+                // CE 是 paper-plugin（隔离类加载器），必须借 CE 插件自己的类加载器解析
+                org.bukkit.plugin.Plugin ce = Bukkit.getPluginManager().getPlugin(PLUGIN_NAME);
+                if (ce == null) {
+                    usable = false;
+                    resolved = true;
+                    return false;
+                }
+                ClassLoader ceLoader = ce.getClass().getClassLoader();
+                Class<?> key = Class.forName("net.momirealms.craftengine.core.util.Key", true, ceLoader);
+                Class<?> images = Class.forName("net.momirealms.craftengine.bukkit.api.CraftEngineImages", true, ceLoader);
+                Class<?> image = Class.forName("net.momirealms.craftengine.core.font.Image", true, ceLoader);
                 keyOf = key.getMethod("of", String.class);
                 imagesById = images.getMethod("byId", key);
-                imageComponentAt = font.getMethod("componentAt", int.class, int.class);
+                // 不用 componentAt：它返回 CE shaded 的 adventure Component，强转会 ClassCastException
+                imageCodepointAt = image.getMethod("codepointAt", int.class, int.class);
                 try {
-                    Class<?> bukkitFont = Class.forName("net.momirealms.craftengine.bukkit.font.BukkitFontManager");
+                    Class<?> bukkitFont = Class.forName("net.momirealms.craftengine.bukkit.font.BukkitFontManager", true, ceLoader);
                     fontManagerInstance = bukkitFont.getMethod("instance");
                     imageByIdValue = bukkitFont.getMethod("imageByIdValue", String.class);
                 } catch (ReflectiveOperationException ignored) {
-                    // 按 value 查是可选通道，缺失时只影响不带命名空间的写法
+                    // 按 value 查是可选通道（CE 26.9 起已移除），缺失时只影响不带命名空间的写法
                 }
                 usable = true;
             } catch (Throwable t) {
@@ -199,6 +263,7 @@ public final class CraftEngineBridge {
 
     /** 供测试与 /cp ce 使用的状态说明：反射句柄是否已就绪。 */
     public static boolean reflectionReady() {
-        return resolved && usable;
+        // 直接探测而非只读缓存：没人用过图片标签时也能给出真实结论（/cp ce 用）
+        return ensureResolved();
     }
 }

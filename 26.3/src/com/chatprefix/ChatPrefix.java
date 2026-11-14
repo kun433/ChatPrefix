@@ -214,17 +214,34 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
     /**
      * 这个接收者是否应按「装了资源包」渲染。
      *
-     * <p>detect 取 auto 时用事件上报结果与 Bukkit/Paper 的 API 综合判断；取 always 时当所有人都装了
-     * （服务器强制下发资源包、或客户端手动装包服务端看不到时可以用它）；取 never 时一律当作没装。
+     * <p>detect 取 auto 时： CraftEngine 接管资源包且 shader-merged 为 true 时直接判作装了
+     * （见 {@link #packViewer(Player)}）；否则用事件上报结果与 Bukkit/Paper 的 API 综合判断。
+     * 取 always 时当所有人都装了；取 never 时一律当作没装。
      */
     public boolean packViewer(Audience viewer) {
         ChatSettings current = settings;
         if (current == null || !current.packEnabled()) {
             return false;
         }
+        String policy = current.packDetect();
+        if ("never".equalsIgnoreCase(policy)) {
+            return false;
+        }
+        if (!(viewer instanceof Player player)) {
+            // 控制台等非玩家接收者：CE 接管时资源包对所有人有效，否则只在 always 时算装了
+            return "always".equalsIgnoreCase(policy) || (ceActive(current) && current.ceShaderMerged());
+        }
+        return packViewer(player);
+    }
+
+    /** 同一套判定的玩家版本，/cp pack 复用。 */
+    public boolean packViewer(Player player) {
+        ChatSettings current = settings;
+        if (current == null || !current.packEnabled()) {
+            return false;
+        }
         // CraftEngine 占着服务器的资源包（而 ChatPrefix 的彩虹着色器不在里面）时，
         // 「装了包」不等于「有着色器」：此时跳过魔法色分支，继续用逐消息相位彩虹。
-        // 用户把着色器手动合并进 CE 的资源包后，把 craftengine.shader-merged 改成 true 即可恢复。
         if (ceActive(current) && !current.ceShaderMerged()) {
             return false;
         }
@@ -232,17 +249,16 @@ public final class ChatPrefix extends JavaPlugin implements Listener {
         if ("never".equalsIgnoreCase(policy)) {
             return false;
         }
+        // CraftEngine 在登录配置阶段自己发资源包数据包（不走 Paper 的 setResourcePack），
+        // PlayerResourcePackStatusEvent 不会触发、hasResourcePack() 恒为 false —— 用 Paper API
+        // 检测永远判「没装包」。shader-merged=true 时 CE 的下发本身就是「装了包」的保证
+        // （默认 kick-if-declined 会踢掉拒绝包的玩家），auto 也直接判作装了。
+        if (ceActive(current) && current.ceShaderMerged()) {
+            return true;
+        }
         if ("always".equalsIgnoreCase(policy)) {
             return true;
         }
-        if (!(viewer instanceof Player player)) {
-            return false;
-        }
-        return packViewer(player);
-    }
-
-    /** 同一套判定的玩家版本，/cp pack 复用。 */
-    public boolean packViewer(Player player) {
         PlayerResourcePackStatusEvent.Status tracked = packStatus.get(player.getUniqueId());
         if (tracked != null) {
             // 事件是最新的真实结果，优先信它；还在下载中的状态则继续问 API

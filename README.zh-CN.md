@@ -226,13 +226,13 @@ separator:
 pack:
   enabled: true
   magic-color: "#F8F85C"   # 必须与资源包 _config.glsl 里 TEXT_EFFECT 的触发色一致
-  detect: auto             # auto = 事件 + API 判定；always = 当所有人都装了；never = 一律当作没装
+  detect: auto             # auto = 事件 + API 判定（CE 接管下发时自动判作装了）；always = 强制装了；never = 一律当作没装
 
 # CraftEngine 集成：把 CE 里的自定义图片用作聊天图标；见「与 CraftEngine 集成」一节。
 craftengine:
   mode: auto            # auto = 检测到 CE 在线时启用；on = 强制启用；off = 关闭
   missing: hide         # hide = 剧除渲染不了的 <image:...> 标签；literal = 保留原文本
-  shader-merged: false  # 只有把 ChatPrefix 的彩虹着色器合并进服务器资源包后才改 true
+  shader-merged: false  # 着色器合并进 CE 自托管资源包后改 true；改了之后 detect=auto 会自动判作装了包
 
 # 把前缀同步到 Tab 列表与头顶名牌（主计分板队伍）；与 LuckPerms/TAB 等队伍插件互斥，二选一
 tab:
@@ -299,7 +299,12 @@ CE 占用着服务器的资源包槽位，ChatPrefix 的彩虹着色器不在里
 3. 把 `craftengine.shader-merged` 改成 `true`，恢复魔法色路径。
 
 CE 侧不需要改任何配置（`exclude-core-shaders` 默认就是 false，不会删着色器），玩家也不用自己装包。
-细节见下文「资源包」一节。
+**插件判定说明（1.5.1 修复）**：CE 在登录配置阶段自己推资源包数据包，不走 Paper 的 `setResourcePack`，
+所以 `PlayerResourcePackStatusEvent` 不会触发、`hasResourcePack()` 恒为 false —— 1.5.0 及以前
+`pack.detect: auto` 会误判「没装包」，魔法色分支进不去，彩虹只剩逐消息相位。1.5.1 起
+`shader-merged: true` 时 auto 直接判作装了包（CE 默认 `kick-if-declined` 会踢掉拒绝包的玩家；
+若你关了踢人，拒绝包的玩家会看到纯色 `#F8F85C`，此时把 `shader-merged` 改回 false 或
+`pack.detect: never`）。细节见下文「资源包」一节。
 
 ## 资源包：真·原地彩虹（可选）
 

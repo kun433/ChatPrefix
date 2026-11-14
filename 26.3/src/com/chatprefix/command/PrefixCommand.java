@@ -591,7 +591,9 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         line(sender, "pack.magic-color", current.packMagicColor());
         if (ChatPrefix.ceActive(current)) {
             line(sender, "CraftEngine 集成", "开启（shader-merged=" + current.ceShaderMerged()
-                    + (current.ceShaderMerged() ? "" : " → 跳过魔法色分支，用逐消息相位彩虹") + "）");
+                    + (current.ceShaderMerged()
+                            ? " → CE 自己在配置阶段下发资源包（不走 Paper API），detect=auto/always 都判作装了包"
+                            : " → 跳过魔法色分支，用逐消息相位彩虹") + "）");
         }
 
         PlayerResourcePackStatusEvent.Status tracked = plugin.trackedPackStatus(player.getUniqueId());
@@ -604,6 +606,11 @@ public final class PrefixCommand implements CommandExecutor, TabCompleter {
         line(sender, "最终判定", viewer
                 ? "算作装了包 → 前缀会刷成魔法色交给着色器"
                 : "算作没装包 → 走逐消息相位彩虹（想强制走资源包就把 pack.detect 改成 always）");
+        if (ChatPrefix.ceActive(current) && current.ceShaderMerged() && tracked != null
+                && tracked != PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED) {
+            line(sender, "注意", "shader-merged=true 时 CE 接管下发，判定不再依赖 Paper 的事件；"
+                    + "玩家若拒绝了 CE 的资源包（默认会被踢下线），会看到纯色 " + current.packMagicColor() + " 而不是彩虹");
+        }
 
         String prefix = plugin.store().prefixOf(player.getUniqueId());
         PrefixStore.Entry own = plugin.store().get(player.getUniqueId());

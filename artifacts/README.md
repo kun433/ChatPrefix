@@ -7,7 +7,7 @@
 
 | 文件 | 用途 | 大小 | SHA1 |
 | --- | --- | --- | --- |
-| `ChatPrefix-1.5.0-26.3.jar` | 插件本体，放进服务器的 `plugins/` | 52962 B | `968fcbada09922b8222803c538c34656fedf3759` |
+| `ChatPrefix-1.5.1-26.3.jar` | 插件本体，放进服务器的 `plugins/`；v1.5.1 修复：CE 接管资源包后 `pack.detect: auto` 误判「没装包」导致彩虹只剩逐消息相位（CE 不走 Paper 的资源包 API，状态事件收不到，现在 shader-merged=true 时 auto 直接判作装了包）；同时修复 `<image:...>` 对真实 CE 的反射通道（paper-plugin 隔离类加载器 + CE 26.x shaded Component） | 54747 B | `22a6f96aa1867714a292bd25642f17a51a52989a` |
 | `ce-resources/chatprefix-rainbow/` | 彩虹着色器的 **CraftEngine 自托管版**（整个文件夹复制到服务器的 `plugins/CraftEngine/resources/` 下） | 36 个文件 | 文件与下面的 zip 内容一致 |
 | `ChatPrefix-Rainbow-1.3.0-CE.zip` | 上面那个文件夹的 zip 版（解压后得到 `chatprefix-rainbow/`，方便下载） | 39097 B | `ca80316b915790ac56620368ae93af0b004b6bb7` |
 
@@ -24,7 +24,7 @@
 **这一版是 26.3 专用的。** 服务端要 Paper/Leaf 26.3 + Java 25；还在 1.21.11 上的服务器请用
 v1.2.1 的 jar 与 1.2.0 的包，两者不能混用（`api-version`、字节码版本、着色器文件名都变了）。
 
-* 插件：`api-version: '26.3'`、`version: 1.5.0-26.3`、Java 25 字节码。1.4.0 新增 CraftEngine 集成；1.5.0 新增称号池与 Tab 同步：
+* 插件：`api-version: '26.3'`、`version: 1.5.1-26.3`、Java 25 字节码。1.4.0 新增 CraftEngine 集成；1.5.0 新增称号池与 Tab 同步：
   与 CraftEngine 的可选集成 —— 前缀/维度标签里可直接写 `<image:命名空间:id[:行:列]>` 渲染成
   CE 图片图标（`/cp set Steve <image:default:icons:0:0>&c管理员`），全程反射调用 CE 公开 API，
   没装 CE 的服务器行为不变；新增 `/cp ce` 状态指令与 `craftengine` 配置节。

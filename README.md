@@ -339,7 +339,14 @@ To get the in-place rainbow on a CE server, hand the shaders to CE instead of sh
 3. Set `craftengine.shader-merged: true` to bring the magic-colour path back.
 
 No CE-side configuration is needed (`exclude-core-shaders` is false by default, so the shaders are
-kept), and players install nothing. Details are in the "Resource pack" section below.
+kept), and players install nothing. **Detection note (fixed in 1.5.1)**: CE pushes its resource pack
+itself during the login configuration phase and never calls Paper's `setResourcePack`, so
+`PlayerResourcePackStatusEvent` never fires and `hasResourcePack()` stays false — with 1.5.0 and
+earlier, `pack.detect: auto` misread every CE player as pack-less and the magic-colour branch never
+ran. From 1.5.1 on, `shader-merged: true` makes auto treat everyone as having the pack (CE kicks
+players who decline by default; if you disabled that, a decliner sees the solid colour `#F8F85C`
+instead — set `shader-merged: false` or `pack.detect: never` in that case). Details are in the
+"Resource pack" section below.
 
 ## Resource pack: a genuinely animated rainbow (optional)
 
